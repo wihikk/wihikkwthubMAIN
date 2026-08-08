@@ -17,7 +17,7 @@ local settings = {
     esp = true, espBoxes = true, espHealth = true, espDist = true, espNames = true, espTeams = true, espTeamsWhite = true,
     tracers = false, chams = false, clickTp = false,
     vehicleEsp = false, submarineEsp = true, uavEsp = true, 
-    ugvEsp = true,
+    ugvEsp = true, showTeamVehicles = false,
     teamCheck = true, noclip = false, fly = false, flySpeed = 250,
     infiniteJump = false, customWalkspeed = false, walkspeedValue = 100, freeCam = false, freeCamSpeed = 100,
     autoAirdrop = false, autoCrates = false, autoOil = false, autoBuild = false,
@@ -48,7 +48,7 @@ local ugvDrawings = {}
 local espObjects = {}
 local tracerObjects = {}
 local favorites = {}
-local entityHealthCache = {}
+local entityDataCache = {}
 
 local freecamPos, freecamYaw, freecamPitch
 local freecamActive = false
@@ -109,32 +109,121 @@ local function findChildLower(parent, name)
     return nil
 end
 
-local function isEntityAlive(model)
+local function getEntityData(model)
+    if not model then return nil end
+    if entityDataCache[model] then return entityDataCache[model] end
+    
+    local data = { seats = {}, healthNode = nil, hasHealth = false, owner = model:GetAttribute("Owner"), team = model:GetAttribute("Team") }
+    for _, d in ipairs(model:GetDescendants()) do
+        if d:IsA("VehicleSeat") or d:IsA("Seat") then
+            table.insert(data.seats, d)
+        elseif not data.healthNode then
+            if d:IsA("Humanoid") then
+                data.healthNode = d
+                data.hasHealth = true
+            elseif d.Name == "Health" and d:IsA("ValueBase") then
+                data.healthNode = d
+                data.hasHealth = true
+            end
+        end
+    end
+    entityDataCache[model] = data
+    return data
+end
+
+local function checkEntityHealth(model)
+    if not model then return false, 100, false end
+    local data = getEntityData(model)
+    if not data then return false, 100, false end
+    
+    local hpNum = 100
+    local hasHealth = false
+    if data.hasHealth and data.healthNode then
+        if data.healthNode:IsA("Humanoid") then
+            hpNum = data.healthNode.Health
+        elseif data.healthNode:IsA("ValueBase") then
+            hpNum = data.healthNode.Value
+        end
+        hasHealth = true
+    else
+        local attr = model:GetAttribute("Health")
+        if type(attr) == "number" then 
+            hpNum = attr
+            data.hasHealth = true 
+            hasHealth = true
+        end
+    end
+    return hpNum > 0, hpNum, hasHealth
+end
+
+local function isFriendlyVehicle(model)
     if not model then return false end
-    local cache = entityHealthCache[model]
-    if not cache or tick() - cache.lastCheck > 1 then
-        local hpNum = 100 
-        local hasHealth = false
-        local hum = model:FindFirstChildWhichIsA("Humanoid")
-        if hum then 
-            hpNum = hum.Health
-            hasHealth = true 
-        else
-            local hVal = model:FindFirstChild("Health", true)
-            if hVal and hVal:IsA("ValueBase") and type(hVal.Value) == "number" then 
-                hpNum = hVal.Value
-                hasHealth = true 
-            else
-                local attr = model:GetAttribute("Health")
-                if type(attr) == "number" then 
-                    hpNum = attr
-                    hasHealth = true 
+    local data = getEntityData(model)
+    if not data then return false end
+    
+    for _, d in ipairs(data.seats) do
+        if d.Occupant then
+            local char = d.Occupant.Parent
+            local plr = Players:GetPlayerFromCharacter(char)
+            if plr then
+                if plr == LocalPlayer or (settings.teamCheck and LocalPlayer.Team and plr.Team == LocalPlayer.Team) then
+                    return true
                 end
             end
         end
-        entityHealthCache[model] = {lastCheck = tick(), hp = hpNum, hasHealth = hasHealth}
     end
-    return entityHealthCache[model].hp > 0
+    
+    local ownerName = model:GetAttribute("Owner") or data.owner
+    if ownerName then
+        if ownerName == LocalPlayer.Name then return true end
+        if settings.teamCheck then
+            local ownerPlr = Players:FindFirstChild(ownerName)
+            if ownerPlr and LocalPlayer.Team and ownerPlr.Team == LocalPlayer.Team then return true end
+        end
+    end
+    
+    local teamAttr = model:GetAttribute("Team") or data.team
+    if teamAttr and settings.teamCheck and LocalPlayer.Team then
+        if tostring(teamAttr) == LocalPlayer.Team.Name then return true end
+    end
+    return false
+end
+
+local function get2DBoundingBox(cf, size, boxScale)
+    local centerPos, centerOnScreen = Camera:WorldToViewportPoint(cf.Position)
+    if centerPos.Z <= 0 then return nil end
+    
+    local sx, sy, sz = (size.X / 2) * boxScale, (size.Y / 2) * boxScale, (size.Z / 2) * boxScale
+    local rv, uv, lv = cf.RightVector, cf.UpVector, cf.LookVector
+    
+    local corners = {
+        cf.Position + rv * sx + uv * sy + lv * sz,
+        cf.Position - rv * sx + uv * sy + lv * sz,
+        cf.Position + rv * sx - uv * sy + lv * sz,
+        cf.Position + rv * sx + uv * sy - lv * sz,
+        cf.Position - rv * sx - uv * sy + lv * sz,
+        cf.Position + rv * sx - uv * sy - lv * sz,
+        cf.Position - rv * sx + uv * sy - lv * sz,
+        cf.Position - rv * sx - uv * sy - lv * sz
+    }
+
+    local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
+    local allInFront = true
+    for _, corner in ipairs(corners) do
+        local pos, onScreen = Camera:WorldToViewportPoint(corner)
+        if pos.Z <= 0 then allInFront = false; break end
+        if pos.X < minX then minX = pos.X end
+        if pos.Y < minY then minY = pos.Y end
+        if pos.X > maxX then maxX = pos.X end
+        if pos.Y > maxY then maxY = pos.Y end
+    end
+    
+    return {
+        allInFront = allInFront,
+        minX = minX, minY = minY, maxX = maxX, maxY = maxY,
+        centerPos = centerPos,
+        centerOnScreen = centerOnScreen
+    }
 end
 
 local FOVring = createDrawing("Circle", {
@@ -315,27 +404,39 @@ PingValue.TextXAlignment = Enum.TextXAlignment.Left
 
 local lastStatsUpdate = tick()
 local framesCount = 0
+local lastFps = 0
+local lastPing = -1
+
 table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
     framesCount = framesCount + 1
     local now = tick()
-    if now - lastStatsUpdate >= 1 then
-        FpsValue.Text = tostring(framesCount)
+    if now - lastStatsUpdate >= 0.5 then
+        local currentFps = math.floor(framesCount / (now - lastStatsUpdate))
+        if currentFps ~= lastFps then
+            FpsValue.Text = tostring(currentFps)
+            lastFps = currentFps
+            pcall(function()
+                local t1 = TweenService:Create(FpsValue, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 0.4})
+                local t2 = TweenService:Create(FpsValue, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {TextTransparency = 0})
+                t1:Play()
+                t1.Completed:Connect(function() t2:Play() end)
+            end)
+        end
+        
         local ping = 0
         pcall(function() ping = math.floor(LocalPlayer:GetNetworkPing() * 1000) end)
         if ping == 0 then pcall(function() ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()) end) end
-        PingValue.Text = tostring(ping)
         
-        pcall(function()
-            local t1 = TweenService:Create(FpsValue, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 0.4})
-            local t2 = TweenService:Create(FpsValue, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {TextTransparency = 0})
-            t1:Play()
-            t1.Completed:Connect(function() t2:Play() end)
-            
-            local p1 = TweenService:Create(PingValue, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 0.4})
-            local p2 = TweenService:Create(PingValue, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {TextTransparency = 0})
-            p1:Play()
-            p1.Completed:Connect(function() p2:Play() end)
-        end)
+        if ping ~= lastPing then
+            PingValue.Text = tostring(ping)
+            lastPing = ping
+            pcall(function()
+                local p1 = TweenService:Create(PingValue, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 0.4})
+                local p2 = TweenService:Create(PingValue, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {TextTransparency = 0})
+                p1:Play()
+                p1.Completed:Connect(function() p2:Play() end)
+            end)
+        end
         
         framesCount = 0
         lastStatsUpdate = now
@@ -397,7 +498,7 @@ Frame.Position = UDim2.new(0, 70, 0, 170)
 Frame.Visible = true
 DevToolsBtn.Visible = true
 
-local menuTw = TweenService:Create(Frame, TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 600), Position = UDim2.new(0, 50, 0, 150)})
+local menuTw = TweenService:Create(Frame, TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, 490, 0, 530), Position = UDim2.new(0, 50, 0, 150)})
 table.insert(activeTweens, menuTw)
 menuTw:Play()
 
@@ -468,7 +569,7 @@ DPClose.TextSize = 14
 DPClose.ZIndex = 62
 
 local DevPanel = Instance.new("Frame", ScreenGui)
-DevPanel.Size = UDim2.new(0, 200, 0, 100)
+DevPanel.Size = UDim2.new(0, 200, 0, 130)
 DevPanel.AnchorPoint = Vector2.new(0.5, 0.5)
 DevPanel.Position = UDim2.new(0.5, 0, 0.5, 0)
 DevPanel.BackgroundColor3 = Theme.PanelBG
@@ -520,6 +621,30 @@ BtnPath.TextSize = 12
 BtnPath.ZIndex = 71
 Instance.new("UICorner", BtnPath).CornerRadius = UDim.new(0, 4)
 Instance.new("UIStroke", BtnPath).Color = Theme.Border
+
+local BtnTeamVeh = Instance.new("TextButton", DevPanel)
+BtnTeamVeh.Size = UDim2.new(1, -20, 0, 30)
+BtnTeamVeh.Position = UDim2.new(0, 10, 0, 85)
+BtnTeamVeh.BackgroundColor3 = settings.showTeamVehicles and Theme.Accent or Theme.OffColor
+BtnTeamVeh.Text = "Your Vehicle"
+BtnTeamVeh.TextColor3 = settings.showTeamVehicles and Color3.fromRGB(0,0,0) or Theme.TextMain
+BtnTeamVeh.Font = Enum.Font.GothamMedium
+BtnTeamVeh.TextSize = 12
+BtnTeamVeh.ZIndex = 71
+Instance.new("UICorner", BtnTeamVeh).CornerRadius = UDim.new(0, 4)
+Instance.new("UIStroke", BtnTeamVeh).Color = Theme.Border
+
+uiUpdaters.showTeamVehicles = function(state)
+    settings.showTeamVehicles = state
+    TweenService:Create(BtnTeamVeh, TweenInfo.new(0.15, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+        BackgroundColor3 = state and Theme.Accent or Theme.OffColor,
+        TextColor3 = state and Color3.fromRGB(0,0,0) or Theme.TextMain
+    }):Play()
+end
+
+BtnTeamVeh.MouseButton1Click:Connect(function()
+    uiUpdaters.showTeamVehicles(not settings.showTeamVehicles)
+end)
 
 local XYZFrame = Instance.new("Frame", ScreenGui)
 XYZFrame.Size = UDim2.new(0, 240, 0, 32)
@@ -686,7 +811,7 @@ TabContainer.BackgroundTransparency = 1
 local TabList = Instance.new("UIListLayout", TabContainer)
 TabList.FillDirection = Enum.FillDirection.Horizontal
 TabList.SortOrder = Enum.SortOrder.LayoutOrder
-TabList.Padding = UDim.new(0, 20)
+TabList.Padding = UDim.new(0, 12)
 
 local Divider = Instance.new("Frame", Frame)
 Divider.Size = UDim2.new(1, -40, 0, 1)
@@ -723,7 +848,7 @@ end
 
 local function createTabButton(name, pageObject, isDefault)
     local Btn = Instance.new("TextButton", TabContainer)
-    Btn.Size = UDim2.new(0, 70, 1, 0)
+    Btn.Size = UDim2.new(0, 65, 1, 0)
     Btn.BackgroundTransparency = 1
     Btn.Text = name
     Btn.Font = Enum.Font.GothamBold
@@ -1100,17 +1225,22 @@ local function createTextBox(placeholder, parent, callback)
     return Box
 end
 
-local PageCombat, CombatLeft, CombatRight = createPage("Combat")
-local PageVisuals, VisualsLeft, VisualsRight = createPage("Visuals")
-local PageAuto, AutoLeft, AutoRight = createPage("Auto")
-local PageMisc, MiscLeft, MiscRight = createPage("Misc")
+local Pages = {}
+Pages.PageCombat, Pages.CombatLeft, Pages.CombatRight = createPage("Combat")
+Pages.PagePlayer, Pages.PlayerLeft, Pages.PlayerRight = createPage("Player")
+Pages.PageVisuals, Pages.VisualsLeft, Pages.VisualsRight = createPage("Visuals")
+Pages.PageAuto, Pages.AutoLeft, Pages.AutoRight = createPage("Auto")
+Pages.PageMisc, Pages.MiscLeft, Pages.MiscRight = createPage("Misc")
+Pages.PageBinds, Pages.BindsLeft, Pages.BindsRight = createPage("Binds")
 
-createTabButton("Combat", PageCombat, true)
-createTabButton("Visuals", PageVisuals, false)
-createTabButton("Auto", PageAuto, false)
-createTabButton("Misc", PageMisc, false)
+createTabButton("Combat", Pages.PageCombat, true)
+createTabButton("Player", Pages.PagePlayer, false)
+createTabButton("Visuals", Pages.PageVisuals, false)
+createTabButton("Auto", Pages.PageAuto, false)
+createTabButton("Misc", Pages.PageMisc, false)
+createTabButton("Binds", Pages.PageBinds, false)
 
-local AimbotGroup = createGroup(CombatLeft)
+local AimbotGroup = createGroup(Pages.CombatLeft)
 createToggle("Aimbot (RMB)", AimbotGroup, "aimbot")
 createToggle("Wall Check", AimbotGroup, "wallCheck")
 createSlider("Aimbot FOV", AimbotGroup, 20, 350, settings.fov, 5, "fov")
@@ -1119,7 +1249,7 @@ createToggle("Predict", AimbotGroup, "predict")
 createSlider("Predict Strength", AimbotGroup, 1, 100, settings.predictStrength, 1, "predictStrength")
 createToggle("Shoot While Sprinting", AimbotGroup, "shootWhileSprinting")
 
-local MovementGroup = createGroup(CombatRight)
+local MovementGroup = createGroup(Pages.PlayerLeft)
 createToggle("Noclip", MovementGroup, "noclip")
 createToggle("Fly", MovementGroup, "fly")
 createSlider("Fly Speed", MovementGroup, 5, 500, settings.flySpeed, 5, "flySpeed")
@@ -1132,10 +1262,22 @@ createToggle("Custom Walkspeed", MovementGroup, "customWalkspeed", function(stat
 end)
 createSlider("Walkspeed Value", MovementGroup, 16, 500, settings.walkspeedValue, 1, "walkspeedValue")
 
-local MiscCombatGroup = createGroup(CombatRight)
+local MiscCombatGroup = createGroup(Pages.CombatRight)
 createToggle("Click TP (LMB)", MiscCombatGroup, "clickTp")
 createDualActionButtons("TP to Base", "TP to Capture", MiscCombatGroup, 
-    function() if baseSpawnCFrame and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then LocalPlayer.Character.HumanoidRootPart.CFrame = baseSpawnCFrame end end,
+    function()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Team then
+            local t = workspace:FindFirstChild("Tycoon")
+            t = t and t:FindFirstChild("Tycoons")
+            t = t and t:FindFirstChild(LocalPlayer.Team.Name)
+            local vis = t and t:FindFirstChild("Essentials") and t.Essentials:FindFirstChild("Spawn Visualizer")
+            if vis then
+                LocalPlayer.Character.HumanoidRootPart.CFrame = vis.CFrame + Vector3.new(0, 3, 0)
+            elseif baseSpawnCFrame then
+                LocalPlayer.Character.HumanoidRootPart.CFrame = baseSpawnCFrame
+            end
+        end
+    end,
     function() 
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then 
             local hrp = LocalPlayer.Character.HumanoidRootPart
@@ -1178,7 +1320,7 @@ table.insert(scriptConnections, UserInputService.JumpRequest:Connect(function()
     end
 end))
 
-local EspGroup = createGroup(VisualsLeft)
+local EspGroup = createGroup(Pages.VisualsLeft)
 createToggle("Player ESP", EspGroup, "esp")
 local EspGrid = createSubGrid(EspGroup)
 createSubButton("Boxes", EspGrid, "espBoxes")
@@ -1190,13 +1332,15 @@ createSubButton("Teams White", EspGrid, "espTeamsWhite")
 createToggle("Tracers", EspGroup, "tracers")
 createToggle("Chams", EspGroup, "chams")
 
-local EnvGroup = createGroup(VisualsRight)
+local EnvGroup = createGroup(Pages.VisualsRight)
 local vehicleToggle = createToggle("Vehicle ESP", EnvGroup, "vehicleEsp", function(v)
     if not v then
         for _, draw in pairs(vehicleDrawings) do
             safeRemoveDrawing(draw.box)
             safeRemoveDrawing(draw.text)
             if draw.healthText then safeRemoveDrawing(draw.healthText) end
+            if draw.occText then safeRemoveDrawing(draw.occText) end
+            if draw.chams then pcall(function() draw.chams:Destroy() end) end
         end
         table.clear(vehicleDrawings)
         table.clear(vehicles)
@@ -1216,26 +1360,44 @@ waitLabel.TextXAlignment = Enum.TextXAlignment.Right
 
 createToggle("Submarine ESP", EnvGroup, "submarineEsp", function(v)
     if not v then
-        for _, draw in pairs(subDrawings) do safeRemoveDrawing(draw.box); safeRemoveDrawing(draw.text) end
+        for _, draw in pairs(subDrawings) do 
+            safeRemoveDrawing(draw.box)
+            safeRemoveDrawing(draw.text)
+            if draw.healthText then safeRemoveDrawing(draw.healthText) end
+            if draw.chams then pcall(function() draw.chams:Destroy() end) end
+        end
+        table.clear(subDrawings)
     end
 end)
 createToggle("UAV ESP", EnvGroup, "uavEsp", function(v)
     if not v then
-        for _, draw in pairs(uavDrawings) do safeRemoveDrawing(draw.box); safeRemoveDrawing(draw.text) end
+        for _, draw in pairs(uavDrawings) do 
+            safeRemoveDrawing(draw.box)
+            safeRemoveDrawing(draw.text)
+            if draw.healthText then safeRemoveDrawing(draw.healthText) end 
+            if draw.chams then pcall(function() draw.chams:Destroy() end) end
+        end
+        table.clear(uavDrawings)
     end
 end)
 createToggle("UGV ESP", EnvGroup, "ugvEsp", function(v)
     if not v then
-        for _, draw in pairs(ugvDrawings) do safeRemoveDrawing(draw.box); safeRemoveDrawing(draw.text) end
+        for _, draw in pairs(ugvDrawings) do 
+            safeRemoveDrawing(draw.box)
+            safeRemoveDrawing(draw.text)
+            if draw.healthText then safeRemoveDrawing(draw.healthText) end 
+            if draw.chams then pcall(function() draw.chams:Destroy() end) end
+        end
+        table.clear(ugvDrawings)
     end
 end)
 
-local AutoFarmGroup = createGroup(AutoLeft)
+local AutoFarmGroup = createGroup(Pages.AutoLeft)
 createToggle("Auto Airdrop", AutoFarmGroup, "autoAirdrop")
 createToggle("Auto Crates", AutoFarmGroup, "autoCrates")
 local OilContainer = createToggle("Auto Oil", AutoFarmGroup, "autoOil")
 
-local TycoonGroup = createGroup(AutoRight)
+local TycoonGroup = createGroup(Pages.AutoRight)
 createToggle("Auto Build", TycoonGroup, "autoBuild")
 
 local OilModal = Instance.new("Frame", ScreenGui)
@@ -1307,14 +1469,14 @@ InfoBtn.MouseButton1Click:Connect(function()
     tw:Play()
 end)
 
-local BindsGroup = createGroup(MiscLeft)
+local BindsGroup = createGroup(Pages.BindsLeft)
 createKeybind("Aimbot Bind", BindsGroup, "aimbot")
 createKeybind("Fly Bind", BindsGroup, "fly")
 createKeybind("Noclip Bind", BindsGroup, "noclip")
 createKeybind("Click TP Bind", BindsGroup, "clickTp")
 createKeybind("Custom TP Bind", BindsGroup, "customTp")
 
-local ClientGroup = createGroup(MiscLeft)
+local ClientGroup = createGroup(Pages.MiscLeft)
 createToggle("Anti AFK", ClientGroup, "antiAfk")
 createToggle("Free Cam", ClientGroup, "freeCam")
 createSlider("Free Cam Speed", ClientGroup, 5, 500, settings.freeCamSpeed, 5, "freeCamSpeed")
@@ -1369,7 +1531,7 @@ createToggle("No Explosions & Particles", ClientGroup, "noExplosions", function(
     if state and _antilag_sweep then _antilag_sweep() end
 end)
 
-local ConfigGroup = createGroup(MiscRight)
+local ConfigGroup = createGroup(Pages.MiscRight)
 local currentConfigName = "default"
 
 pcall(function()
@@ -1842,9 +2004,19 @@ local function UnloadScript()
     
     safeRemoveDrawing(FOVring)
     
+    for _, p in pairs(espObjects) do
+        if p.chams then pcall(function() p.chams:Destroy() end) end
+    end
+    
     local function cleanDrawings(tbl)
         for k, v in pairs(tbl) do
-            if type(v) == "table" then for _, d in pairs(v) do safeRemoveDrawing(d) end else safeRemoveDrawing(v) end
+            if type(v) == "table" then 
+                for _, d in pairs(v) do 
+                    if typeof(d) == "Instance" then pcall(function() d:Destroy() end) else safeRemoveDrawing(d) end 
+                end 
+            else 
+                safeRemoveDrawing(v) 
+            end
         end
         table.clear(tbl)
     end
@@ -1854,9 +2026,8 @@ local function UnloadScript()
     cleanDrawings(vehicleDrawings); cleanDrawings(subDrawings)
     cleanDrawings(uavDrawings); cleanDrawings(ugvDrawings)
     
-    for _, p in pairs(espObjects) do
-        if p.chams then pcall(function() p.chams:Destroy() end) end
-    end
+    for _, c in ipairs(sprintConns) do pcall(function() c:Disconnect() end) end
+    table.clear(sprintConns)
     
     table.clear(vehicles)
     table.clear(uiUpdaters)
@@ -1864,7 +2035,7 @@ local function UnloadScript()
     table.clear(sysCache.subs)
     table.clear(sysCache.uavs)
     table.clear(sysCache.ugvs)
-    table.clear(entityHealthCache)
+    table.clear(entityDataCache)
     
     pcall(function() VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game) end)
     
@@ -1892,7 +2063,6 @@ local function UnloadScript()
     end
 end
 
-local lastSysCheck = 0
 local targetFps = 60
 local frameDelay = 1 / targetFps
 local lastFrameTime = 0
@@ -1989,6 +2159,8 @@ table.insert(scriptConnections, RunService.Stepped:Connect(function()
         end
     end
 end))
+
+local lastSysCheck = 0
 
 table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
     if settings.customWalkspeed and LocalPlayer.Character then
@@ -2090,7 +2262,12 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
         local tracer = tracerObjects[player]
         local char = player.Character
 
-        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Head") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 and (not settings.teamCheck or player.Team ~= LocalPlayer.Team) and (player.Team == nil or string.lower(player.Team.Name) ~= "loading") then
+        local isHiddenByVehicle = false
+        if settings.vehicleEsp and char and char:FindFirstChild("Humanoid") and char.Humanoid.SeatPart then
+            isHiddenByVehicle = true
+        end
+
+        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Head") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 and (not settings.teamCheck or player.Team ~= LocalPlayer.Team) and (player.Team == nil or string.lower(player.Team.Name) ~= "loading") and not isHiddenByVehicle then
             local rPos = char.HumanoidRootPart.Position
             local b2d, onB = Camera:WorldToViewportPoint(rPos - Vector3.new(0, 3, 0))
             local t2d, onT = Camera:WorldToViewportPoint(char.Head.Position + Vector3.new(0, 0.5, 0))
@@ -2177,81 +2354,119 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
             for i, seat in ipairs(vehicles) do
                 if seat and seat.Parent then
                     if not vehicleDrawings[i] then 
+                        local vCham = Instance.new("Highlight")
+                        vCham.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                        vCham.FillTransparency = 0.5
+                        vCham.OutlineTransparency = 0
+                        vCham.FillColor = Color3.fromRGB(150, 150, 255)
+                        vCham.OutlineColor = Color3.new(1,1,1)
+                        pcall(function() vCham.Parent = game:GetService("CoreGui") end)
+
                         vehicleDrawings[i] = { 
                             box = createDrawing("Square", {Thickness = 1, Color = Color3.fromRGB(150, 150, 255), Filled = false, Visible = false}), 
                             text = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(150, 150, 255), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
-                            healthText = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(100, 255, 100), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false})
+                            healthText = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(100, 255, 100), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
+                            occText = createDrawing("Text", {Center = true, Size = 13, Font = 2, Color = Color3.fromRGB(200, 200, 200), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
+                            chams = vCham
                         } 
                     end
                     pcall(function()
                         local model = seat:FindFirstAncestorOfClass("Model")
                         local cf, size = seat.CFrame, seat.Size
                         local name = "Vehicle"
-                        if model then cf, size = model:GetBoundingBox()
-                            name = model.Name end
-                            
-                        if not isEntityAlive(model) then
+                        if model then 
+                            cf, size = model:GetBoundingBox()
+                            name = model.Name 
+                        end
+                        
+                        local isAlive, currentHp, hasHealth = checkEntityHealth(model)
+
+                        if not isAlive or (not settings.showTeamVehicles and isFriendlyVehicle(model)) then
                             vehicleDrawings[i].box.Visible = false
                             vehicleDrawings[i].text.Visible = false
                             vehicleDrawings[i].healthText.Visible = false
+                            vehicleDrawings[i].occText.Visible = false
+                            vehicleDrawings[i].chams.Enabled = false
                             return 
                         end
                         
                         local hTxt = ""
-                        if model and entityHealthCache[model] and entityHealthCache[model].hasHealth then
-                            hTxt = math.floor(entityHealthCache[model].hp) .. " HP"
+                        if hasHealth then hTxt = math.floor(currentHp) .. " HP" end
+
+                        local occupantName = "Empty"
+                        if seat.Occupant then
+                            local occChar = seat.Occupant.Parent
+                            local occPlr = Players:GetPlayerFromCharacter(occChar)
+                            if occPlr then
+                                local tName = occPlr.Team and occPlr.Team.Name or "No Team"
+                                occupantName = occPlr.Name .. "  |  " .. tName
+                            end
                         end
 
-                        local boxScale = 0.65
-                        local sx, sy, sz = (size.X / 2) * boxScale, (size.Y / 2) * boxScale, (size.Z / 2) * boxScale
-                        local corners = { (cf * CFrame.new(sx, sy, sz)).Position, (cf * CFrame.new(-sx, sy, sz)).Position, (cf * CFrame.new(sx, -sy, sz)).Position, (cf * CFrame.new(sx, sy, -sz)).Position, (cf * CFrame.new(-sx, -sy, sz)).Position, (cf * CFrame.new(sx, -sy, -sz)).Position, (cf * CFrame.new(-sx, sy, -sz)).Position, (cf * CFrame.new(-sx, -sy, -sz)).Position }
-                        local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
-                        local allInFront = true
-                        for _, corner3D in ipairs(corners) do
-                            local pos2D, onScreen = Camera:WorldToViewportPoint(corner3D)
-                            if pos2D.Z <= 0 then allInFront = false break end
-                            minX = math.min(minX, pos2D.X)
-                            minY = math.min(minY, pos2D.Y)
-                            maxX = math.max(maxX, pos2D.X)
-                            maxY = math.max(maxY, pos2D.Y)
-                        end
-                        if allInFront then
-                            vehicleDrawings[i].box.Size = Vector2.new(maxX - minX, maxY - minY)
-                            vehicleDrawings[i].box.Position = Vector2.new(minX, minY)
-                            vehicleDrawings[i].box.Visible = true
-                            local dist = math.floor((Camera.CFrame.Position - cf.Position).Magnitude)
-                            vehicleDrawings[i].text.Text = "[" .. name .. "] " .. dist .. "m"
-                            vehicleDrawings[i].text.Position = Vector2.new(minX + (maxX - minX)/2, maxY + 5)
-                            vehicleDrawings[i].text.Visible = true
+                        local bbox = get2DBoundingBox(cf, size, 0.65)
+                        if bbox then
+                            vehicleDrawings[i].chams.Adornee = model
+                            vehicleDrawings[i].chams.Enabled = true
+                            vehicleDrawings[i].box.Visible = false
                             
-                            if hTxt ~= "" then
-                                vehicleDrawings[i].healthText.Text = hTxt
-                                vehicleDrawings[i].healthText.Position = Vector2.new(minX + (maxX - minX)/2, minY - 17)
-                                vehicleDrawings[i].healthText.Visible = true
-                            else
-                                vehicleDrawings[i].healthText.Visible = false
-                            end
-                        else
-                            local centerPos, centerOnScreen = Camera:WorldToViewportPoint(cf.Position)
-                            if centerOnScreen and centerPos.Z > 0 then
-                                vehicleDrawings[i].box.Visible = false
+                            if bbox.allInFront then
+                                vehicleDrawings[i].box.Size = Vector2.new(bbox.maxX - bbox.minX, bbox.maxY - bbox.minY)
+                                vehicleDrawings[i].box.Position = Vector2.new(bbox.minX, bbox.minY)
+                                
                                 local dist = math.floor((Camera.CFrame.Position - cf.Position).Magnitude)
-                                vehicleDrawings[i].text.Text = "[" .. name .. "] " .. dist .. "m"
-                                vehicleDrawings[i].text.Position = Vector2.new(centerPos.X, centerPos.Y)
+                                vehicleDrawings[i].text.Text = "" .. name .. "  |  " .. dist .. "m"
+                                vehicleDrawings[i].text.Position = Vector2.new(bbox.minX + (bbox.maxX - bbox.minX)/2, bbox.maxY + 5)
                                 vehicleDrawings[i].text.Visible = true
                                 
                                 if hTxt ~= "" then
                                     vehicleDrawings[i].healthText.Text = hTxt
-                                    vehicleDrawings[i].healthText.Position = Vector2.new(centerPos.X, centerPos.Y - 17)
+                                    vehicleDrawings[i].healthText.Position = Vector2.new(bbox.minX + (bbox.maxX - bbox.minX)/2, bbox.minY - 17)
                                     vehicleDrawings[i].healthText.Visible = true
                                 else
                                     vehicleDrawings[i].healthText.Visible = false
                                 end
-                            else 
-                                vehicleDrawings[i].box.Visible = false
-                                vehicleDrawings[i].text.Visible = false
-                                vehicleDrawings[i].healthText.Visible = false
+
+                                if occupantName ~= "" then
+                                    vehicleDrawings[i].occText.Text = occupantName
+                                    vehicleDrawings[i].occText.Position = Vector2.new(bbox.minX + (bbox.maxX - bbox.minX)/2, bbox.maxY + 18)
+                                    vehicleDrawings[i].occText.Visible = true
+                                else
+                                    vehicleDrawings[i].occText.Visible = false
+                                end
+                            else
+                                if bbox.centerOnScreen then
+                                    local dist = math.floor((Camera.CFrame.Position - cf.Position).Magnitude)
+                                    vehicleDrawings[i].text.Text = "" .. name .. "  |  " .. dist .. "m"
+                                    vehicleDrawings[i].text.Position = Vector2.new(bbox.centerPos.X, bbox.centerPos.Y)
+                                    vehicleDrawings[i].text.Visible = true
+                                    
+                                    if hTxt ~= "" then
+                                        vehicleDrawings[i].healthText.Text = hTxt
+                                        vehicleDrawings[i].healthText.Position = Vector2.new(bbox.centerPos.X, bbox.centerPos.Y - 17)
+                                        vehicleDrawings[i].healthText.Visible = true
+                                    else
+                                        vehicleDrawings[i].healthText.Visible = false
+                                    end
+
+                                    if occupantName ~= "" then
+                                        vehicleDrawings[i].occText.Text = occupantName
+                                        vehicleDrawings[i].occText.Position = Vector2.new(bbox.centerPos.X, bbox.centerPos.Y + 13)
+                                        vehicleDrawings[i].occText.Visible = true
+                                    else
+                                        vehicleDrawings[i].occText.Visible = false
+                                    end
+                                else 
+                                    vehicleDrawings[i].text.Visible = false
+                                    vehicleDrawings[i].healthText.Visible = false
+                                    vehicleDrawings[i].occText.Visible = false
+                                end
                             end
+                        else
+                            vehicleDrawings[i].chams.Enabled = false
+                            vehicleDrawings[i].box.Visible = false
+                            vehicleDrawings[i].text.Visible = false
+                            vehicleDrawings[i].healthText.Visible = false
+                            vehicleDrawings[i].occText.Visible = false
                         end
                     end)
                 end
@@ -2261,6 +2476,8 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                     vehicleDrawings[i].box.Visible = false
                     vehicleDrawings[i].text.Visible = false
                     vehicleDrawings[i].healthText.Visible = false 
+                    if vehicleDrawings[i].occText then vehicleDrawings[i].occText.Visible = false end
+                    if vehicleDrawings[i].chams then vehicleDrawings[i].chams.Enabled = false end
                 end)
             end
         end
@@ -2279,6 +2496,9 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                 sysCache.subs = {}
                 sysCache.uavs = {}
                 sysCache.ugvs = {}
+            end
+            for mdl, _ in pairs(entityDataCache) do
+                if not mdl.Parent then entityDataCache[mdl] = nil end
             end
         end
 
@@ -2310,47 +2530,91 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
             local currentSubs = {}
             for _, obj in ipairs(sysCache.subs) do if obj:IsA("Model") then table.insert(currentSubs, obj) end end
             for i, model in ipairs(currentSubs) do
-                if not subDrawings[i] then subDrawings[i] = { box = createDrawing("Square", {Thickness = 1, Color = Color3.fromRGB(0, 255, 255), Filled = false, Visible = false}), text = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(0, 255, 255), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}) } end
+                if not subDrawings[i] then 
+                    local sCham = Instance.new("Highlight")
+                    sCham.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    sCham.FillTransparency = 0.5
+                    sCham.OutlineTransparency = 0
+                    sCham.FillColor = Color3.fromRGB(0, 255, 255)
+                    sCham.OutlineColor = Color3.new(1,1,1)
+                    pcall(function() sCham.Parent = game:GetService("CoreGui") end)
+
+                    subDrawings[i] = { 
+                        box = createDrawing("Square", {Thickness = 1, Color = Color3.fromRGB(0, 255, 255), Filled = false, Visible = false}), 
+                        text = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(0, 255, 255), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
+                        healthText = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(100, 255, 100), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
+                        chams = sCham
+                    } 
+                end
                 pcall(function()
-                    if not isEntityAlive(model) then
+                    local isAlive, currentHp, hasHealth = checkEntityHealth(model)
+                    if not isAlive or (not settings.showTeamVehicles and isFriendlyVehicle(model)) then
                         subDrawings[i].box.Visible = false
                         subDrawings[i].text.Visible = false
+                        subDrawings[i].healthText.Visible = false
+                        subDrawings[i].chams.Enabled = false
                         return
                     end
+                    
+                    local hTxt = ""
+                    if hasHealth then hTxt = math.floor(currentHp) .. " HP" end
+                    
                     local cf, size = getVisBB(model)
-                    local boxScale = 0.65
-                    local sx, sy, sz = (size.X / 2) * boxScale, (size.Y / 2) * boxScale, (size.Z / 2) * boxScale
-                    local corners = { (cf * CFrame.new(sx, sy, sz)).Position, (cf * CFrame.new(-sx, sy, sz)).Position, (cf * CFrame.new(sx, -sy, sz)).Position, (cf * CFrame.new(sx, sy, -sz)).Position, (cf * CFrame.new(-sx, -sy, sz)).Position, (cf * CFrame.new(sx, -sy, -sz)).Position, (cf * CFrame.new(-sx, sy, -sz)).Position, (cf * CFrame.new(-sx, -sy, -sz)).Position }
-                    local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
-                    local allInFront = true
-                    for _, corner3D in ipairs(corners) do
-                        local pos2D, onScreen = Camera:WorldToViewportPoint(corner3D)
-                        if pos2D.Z <= 0 then allInFront = false break end
-                        minX = math.min(minX, pos2D.X)
-                        minY = math.min(minY, pos2D.Y)
-                        maxX = math.max(maxX, pos2D.X)
-                        maxY = math.max(maxY, pos2D.Y)
-                    end
-                    if allInFront then
-                        subDrawings[i].box.Size = Vector2.new(maxX - minX, maxY - minY)
-                        subDrawings[i].box.Position = Vector2.new(minX, minY)
-                        subDrawings[i].box.Visible = true; local dist = math.floor((Camera.CFrame.Position - cf.Position).Magnitude)
-                        subDrawings[i].text.Text = "[" .. model.Name .. "] " .. dist .. "m"
-                        subDrawings[i].text.Position = Vector2.new(minX + (maxX - minX)/2, maxY + 5)
-                        subDrawings[i].text.Visible = true
-                    else
-                        local centerPos, centerOnScreen = Camera:WorldToViewportPoint(cf.Position)
-                        if centerOnScreen and centerPos.Z > 0 then subDrawings[i].box.Visible = false
+                    local bbox = get2DBoundingBox(cf, size, 0.65)
+                    
+                    if bbox then
+                        subDrawings[i].chams.Adornee = model
+                        subDrawings[i].chams.Enabled = true
+                        subDrawings[i].box.Visible = false
+                        
+                        if bbox.allInFront then
+                            subDrawings[i].box.Size = Vector2.new(bbox.maxX - bbox.minX, bbox.maxY - bbox.minY)
+                            subDrawings[i].box.Position = Vector2.new(bbox.minX, bbox.minY)
                             local dist = math.floor((Camera.CFrame.Position - cf.Position).Magnitude)
-                            subDrawings[i].text.Text = "[" .. model.Name .. "] " .. dist .. "m"
-                            subDrawings[i].text.Position = Vector2.new(centerPos.X, centerPos.Y)
-                            subDrawings[i].text.Visible = true else subDrawings[i].box.Visible = false
-                            subDrawings[i].text.Visible = false end
+                            subDrawings[i].text.Text = "" .. model.Name .. "  |  " .. dist .. "m"
+                            subDrawings[i].text.Position = Vector2.new(bbox.minX + (bbox.maxX - bbox.minX)/2, bbox.maxY + 5)
+                            subDrawings[i].text.Visible = true
+                            
+                            if hTxt ~= "" then
+                                subDrawings[i].healthText.Text = hTxt
+                                subDrawings[i].healthText.Position = Vector2.new(bbox.minX + (bbox.maxX - bbox.minX)/2, bbox.minY - 17)
+                                subDrawings[i].healthText.Visible = true
+                            else
+                                subDrawings[i].healthText.Visible = false
+                            end
+                        else
+                            if bbox.centerOnScreen then
+                                local dist = math.floor((Camera.CFrame.Position - cf.Position).Magnitude)
+                                subDrawings[i].text.Text = "" .. model.Name .. "  |  " .. dist .. "m"
+                                subDrawings[i].text.Position = Vector2.new(bbox.centerPos.X, bbox.centerPos.Y)
+                                subDrawings[i].text.Visible = true 
+                                
+                                if hTxt ~= "" then
+                                    subDrawings[i].healthText.Text = hTxt
+                                    subDrawings[i].healthText.Position = Vector2.new(bbox.centerPos.X, bbox.centerPos.Y - 17)
+                                    subDrawings[i].healthText.Visible = true
+                                else
+                                    subDrawings[i].healthText.Visible = false
+                                end
+                            else 
+                                subDrawings[i].text.Visible = false 
+                                subDrawings[i].healthText.Visible = false 
+                            end
+                        end
+                    else
+                        subDrawings[i].chams.Enabled = false
+                        subDrawings[i].box.Visible = false
+                        subDrawings[i].text.Visible = false
+                        subDrawings[i].healthText.Visible = false
                     end
                 end)
             end
-            for i = #currentSubs + 1, #subDrawings do pcall(function() subDrawings[i].box.Visible = false
-                subDrawings[i].text.Visible = false end) end
+            for i = #currentSubs + 1, #subDrawings do pcall(function() 
+                subDrawings[i].box.Visible = false
+                subDrawings[i].text.Visible = false 
+                if subDrawings[i].healthText then subDrawings[i].healthText.Visible = false end
+                if subDrawings[i].chams then subDrawings[i].chams.Enabled = false end
+            end) end
         end
 
         if settings.uavEsp then 
@@ -2358,47 +2622,91 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
             local allowed = { ["S-70 Okhotnik"] = true, ["MQ-1 Predator"] = true, ["TB2 Bayraktar"] = true, ["MQ-9 Reaper"] = true }
             for _, obj in ipairs(sysCache.uavs) do if obj:IsA("Model") and allowed[obj.Name] then table.insert(currentUavs, obj) end end
             for i, model in ipairs(currentUavs) do
-                if not uavDrawings[i] then uavDrawings[i] = { box = createDrawing("Square", {Thickness = 1, Color = Color3.fromRGB(255, 140, 0), Filled = false, Visible = false}), text = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(255, 140, 0), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}) } end
+                if not uavDrawings[i] then 
+                    local uCham = Instance.new("Highlight")
+                    uCham.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    uCham.FillTransparency = 0.5
+                    uCham.OutlineTransparency = 0
+                    uCham.FillColor = Color3.fromRGB(255, 140, 0)
+                    uCham.OutlineColor = Color3.new(1,1,1)
+                    pcall(function() uCham.Parent = game:GetService("CoreGui") end)
+
+                    uavDrawings[i] = { 
+                        box = createDrawing("Square", {Thickness = 1, Color = Color3.fromRGB(255, 140, 0), Filled = false, Visible = false}), 
+                        text = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(255, 140, 0), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
+                        healthText = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(100, 255, 100), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
+                        chams = uCham
+                    } 
+                end
                 pcall(function()
-                    if not isEntityAlive(model) then
+                    local isAlive, currentHp, hasHealth = checkEntityHealth(model)
+                    if not isAlive or (not settings.showTeamVehicles and isFriendlyVehicle(model)) then
                         uavDrawings[i].box.Visible = false
                         uavDrawings[i].text.Visible = false
+                        uavDrawings[i].healthText.Visible = false
+                        uavDrawings[i].chams.Enabled = false
                         return
                     end
+                    
+                    local hTxt = ""
+                    if hasHealth then hTxt = math.floor(currentHp) .. " HP" end
+                    
                     local cf, size = model:GetBoundingBox()
-                    local boxScale = 0.5
-                    local sx, sy, sz = (size.X / 2) * boxScale, (size.Y / 2) * boxScale, (size.Z / 2) * boxScale
-                    local corners = { (cf * CFrame.new(sx, sy, sz)).Position, (cf * CFrame.new(-sx, sy, sz)).Position, (cf * CFrame.new(sx, -sy, sz)).Position, (cf * CFrame.new(sx, sy, -sz)).Position, (cf * CFrame.new(-sx, -sy, sz)).Position, (cf * CFrame.new(sx, -sy, -sz)).Position, (cf * CFrame.new(-sx, sy, -sz)).Position, (cf * CFrame.new(-sx, -sy, -sz)).Position }
-                    local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
-                    local allInFront = true
-                    for _, corner3D in ipairs(corners) do
-                        local pos2D, onScreen = Camera:WorldToViewportPoint(corner3D)
-                        if pos2D.Z <= 0 then allInFront = false break end
-                        minX = math.min(minX, pos2D.X)
-                        minY = math.min(minY, pos2D.Y)
-                        maxX = math.max(maxX, pos2D.X)
-                        maxY = math.max(maxY, pos2D.Y)
-                    end
-                    if allInFront then
-                        uavDrawings[i].box.Size = Vector2.new(maxX - minX, maxY - minY)
-                        uavDrawings[i].box.Position = Vector2.new(minX, minY); uavDrawings[i].box.Visible = true
-                        local dist = math.floor((Camera.CFrame.Position - cf.Position).Magnitude)
-                        uavDrawings[i].text.Text = "[" .. model.Name .. "] " .. dist .. "m"
-                        uavDrawings[i].text.Position = Vector2.new(minX + (maxX - minX)/2, maxY + 5)
-                        uavDrawings[i].text.Visible = true
-                    else
-                        local centerPos, centerOnScreen = Camera:WorldToViewportPoint(cf.Position)
-                        if centerOnScreen and centerPos.Z > 0 then uavDrawings[i].box.Visible = false
+                    local bbox = get2DBoundingBox(cf, size, 0.5)
+
+                    if bbox then
+                        uavDrawings[i].chams.Adornee = model
+                        uavDrawings[i].chams.Enabled = true
+                        uavDrawings[i].box.Visible = false
+                        
+                        if bbox.allInFront then
+                            uavDrawings[i].box.Size = Vector2.new(bbox.maxX - bbox.minX, bbox.maxY - bbox.minY)
+                            uavDrawings[i].box.Position = Vector2.new(bbox.minX, bbox.minY)
                             local dist = math.floor((Camera.CFrame.Position - cf.Position).Magnitude)
-                            uavDrawings[i].text.Text = "[" .. model.Name .. "] " .. dist .. "m"
-                            uavDrawings[i].text.Position = Vector2.new(centerPos.X, centerPos.Y)
-                            uavDrawings[i].text.Visible = true else uavDrawings[i].box.Visible = false
-                            uavDrawings[i].text.Visible = false end
+                            uavDrawings[i].text.Text = "" .. model.Name .. "  |  " .. dist .. "m"
+                            uavDrawings[i].text.Position = Vector2.new(bbox.minX + (bbox.maxX - bbox.minX)/2, bbox.maxY + 5)
+                            uavDrawings[i].text.Visible = true
+                            
+                            if hTxt ~= "" then
+                                uavDrawings[i].healthText.Text = hTxt
+                                uavDrawings[i].healthText.Position = Vector2.new(bbox.minX + (bbox.maxX - bbox.minX)/2, bbox.minY - 17)
+                                uavDrawings[i].healthText.Visible = true
+                            else
+                                uavDrawings[i].healthText.Visible = false
+                            end
+                        else
+                            if bbox.centerOnScreen then
+                                local dist = math.floor((Camera.CFrame.Position - cf.Position).Magnitude)
+                                uavDrawings[i].text.Text = "" .. model.Name .. "  |  " .. dist .. "m"
+                                uavDrawings[i].text.Position = Vector2.new(bbox.centerPos.X, bbox.centerPos.Y)
+                                uavDrawings[i].text.Visible = true 
+                                
+                                if hTxt ~= "" then
+                                    uavDrawings[i].healthText.Text = hTxt
+                                    uavDrawings[i].healthText.Position = Vector2.new(bbox.centerPos.X, bbox.centerPos.Y - 17)
+                                    uavDrawings[i].healthText.Visible = true
+                                else
+                                    uavDrawings[i].healthText.Visible = false
+                                end
+                            else 
+                                uavDrawings[i].text.Visible = false 
+                                uavDrawings[i].healthText.Visible = false 
+                            end
+                        end
+                    else
+                        uavDrawings[i].chams.Enabled = false
+                        uavDrawings[i].box.Visible = false
+                        uavDrawings[i].text.Visible = false
+                        uavDrawings[i].healthText.Visible = false
                     end
                 end)
             end
-            for i = #currentUavs + 1, #uavDrawings do pcall(function() uavDrawings[i].box.Visible = false
-                uavDrawings[i].text.Visible = false end) end
+            for i = #currentUavs + 1, #uavDrawings do pcall(function() 
+                uavDrawings[i].box.Visible = false
+                uavDrawings[i].text.Visible = false 
+                if uavDrawings[i].healthText then uavDrawings[i].healthText.Visible = false end
+                if uavDrawings[i].chams then uavDrawings[i].chams.Enabled = false end
+            end) end
         end
 
         if settings.ugvEsp then
@@ -2406,47 +2714,91 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
             local allowed = { ["Ripsaw M5"] = true, ["Aselsan Gurz"] = true }
             for _, obj in ipairs(sysCache.ugvs) do if obj:IsA("Model") and allowed[obj.Name] then table.insert(currentUgvs, obj) end end
             for i, model in ipairs(currentUgvs) do
-                if not ugvDrawings[i] then ugvDrawings[i] = { box = createDrawing("Square", {Thickness = 1, Color = Color3.fromRGB(120, 255, 120), Filled = false, Visible = false}), text = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(120, 255, 120), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}) } end
+                if not ugvDrawings[i] then 
+                    local gCham = Instance.new("Highlight")
+                    gCham.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    gCham.FillTransparency = 0.5
+                    gCham.OutlineTransparency = 0
+                    gCham.FillColor = Color3.fromRGB(120, 255, 120)
+                    gCham.OutlineColor = Color3.new(1,1,1)
+                    pcall(function() gCham.Parent = game:GetService("CoreGui") end)
+
+                    ugvDrawings[i] = { 
+                        box = createDrawing("Square", {Thickness = 1, Color = Color3.fromRGB(120, 255, 120), Filled = false, Visible = false}), 
+                        text = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(120, 255, 120), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
+                        healthText = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(100, 255, 100), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
+                        chams = gCham
+                    } 
+                end
                 pcall(function()
-                    if not isEntityAlive(model) then
+                    local isAlive, currentHp, hasHealth = checkEntityHealth(model)
+                    if not isAlive or (not settings.showTeamVehicles and isFriendlyVehicle(model)) then
                         ugvDrawings[i].box.Visible = false
                         ugvDrawings[i].text.Visible = false
+                        ugvDrawings[i].healthText.Visible = false
+                        ugvDrawings[i].chams.Enabled = false
                         return
                     end
+                    
+                    local hTxt = ""
+                    if hasHealth then hTxt = math.floor(currentHp) .. " HP" end
+                    
                     local cf, size = model:GetBoundingBox()
-                    local scale = 0.65
-                    local sx, sy, sz = (size.X / 2) * scale, (size.Y / 2) * scale, (size.Z / 2) * scale
-                    local corners = { (cf * CFrame.new(sx, sy, sz)).Position, (cf * CFrame.new(-sx, sy, sz)).Position, (cf * CFrame.new(sx, -sy, sz)).Position, (cf * CFrame.new(sx, sy, -sz)).Position, (cf * CFrame.new(-sx, -sy, sz)).Position, (cf * CFrame.new(sx, -sy, -sz)).Position, (cf * CFrame.new(-sx, sy, -sz)).Position, (cf * CFrame.new(-sx, -sy, -sz)).Position }
-                    local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
-                    local allInFront = true
-                    for _, corner3D in ipairs(corners) do
-                        local pos2D, onScreen = Camera:WorldToViewportPoint(corner3D)
-                        if pos2D.Z <= 0 then allInFront = false break end
-                        minX = math.min(minX, pos2D.X)
-                        minY = math.min(minY, pos2D.Y)
-                        maxX = math.max(maxX, pos2D.X)
-                        maxY = math.max(maxY, pos2D.Y)
-                    end
-                    if allInFront then
-                        ugvDrawings[i].box.Size = Vector2.new(maxX - minX, maxY - minY)
-                        ugvDrawings[i].box.Position = Vector2.new(minX, minY); ugvDrawings[i].box.Visible = true
-                        local dist = math.floor((Camera.CFrame.Position - cf.Position).Magnitude)
-                        ugvDrawings[i].text.Text = "[" .. model.Name .. "] " .. dist .. "m"
-                        ugvDrawings[i].text.Position = Vector2.new(minX + (maxX - minX)/2, maxY + 5)
-                        ugvDrawings[i].text.Visible = true
-                    else
-                        local centerPos, centerOnScreen = Camera:WorldToViewportPoint(cf.Position)
-                        if centerOnScreen and centerPos.Z > 0 then ugvDrawings[i].box.Visible = false
+                    local bbox = get2DBoundingBox(cf, size, 0.65)
+                    
+                    if bbox then
+                        ugvDrawings[i].chams.Adornee = model
+                        ugvDrawings[i].chams.Enabled = true
+                        ugvDrawings[i].box.Visible = false
+                        
+                        if bbox.allInFront then
+                            ugvDrawings[i].box.Size = Vector2.new(bbox.maxX - bbox.minX, bbox.maxY - bbox.minY)
+                            ugvDrawings[i].box.Position = Vector2.new(bbox.minX, bbox.minY)
                             local dist = math.floor((Camera.CFrame.Position - cf.Position).Magnitude)
-                            ugvDrawings[i].text.Text = "[" .. model.Name .. "] " .. dist .. "m"
-                            ugvDrawings[i].text.Position = Vector2.new(centerPos.X, centerPos.Y)
-                            ugvDrawings[i].text.Visible = true else ugvDrawings[i].box.Visible = false
-                            ugvDrawings[i].text.Visible = false end
+                            ugvDrawings[i].text.Text = "" .. model.Name .. "  |  " .. dist .. "m"
+                            ugvDrawings[i].text.Position = Vector2.new(bbox.minX + (bbox.maxX - bbox.minX)/2, bbox.maxY + 5)
+                            ugvDrawings[i].text.Visible = true
+                            
+                            if hTxt ~= "" then
+                                ugvDrawings[i].healthText.Text = hTxt
+                                ugvDrawings[i].healthText.Position = Vector2.new(bbox.minX + (bbox.maxX - bbox.minX)/2, bbox.minY - 17)
+                                ugvDrawings[i].healthText.Visible = true
+                            else
+                                ugvDrawings[i].healthText.Visible = false
+                            end
+                        else
+                            if bbox.centerOnScreen then
+                                local dist = math.floor((Camera.CFrame.Position - cf.Position).Magnitude)
+                                ugvDrawings[i].text.Text = "" .. model.Name .. "  |  " .. dist .. "m"
+                                ugvDrawings[i].text.Position = Vector2.new(bbox.centerPos.X, bbox.centerPos.Y)
+                                ugvDrawings[i].text.Visible = true 
+                                
+                                if hTxt ~= "" then
+                                    ugvDrawings[i].healthText.Text = hTxt
+                                    ugvDrawings[i].healthText.Position = Vector2.new(bbox.centerPos.X, bbox.centerPos.Y - 17)
+                                    ugvDrawings[i].healthText.Visible = true
+                                else
+                                    ugvDrawings[i].healthText.Visible = false
+                                end
+                            else 
+                                ugvDrawings[i].text.Visible = false 
+                                ugvDrawings[i].healthText.Visible = false 
+                            end
+                        end
+                    else
+                        ugvDrawings[i].chams.Enabled = false
+                        ugvDrawings[i].box.Visible = false
+                        ugvDrawings[i].text.Visible = false
+                        ugvDrawings[i].healthText.Visible = false
                     end
                 end)
             end
-            for i = #currentUgvs + 1, #ugvDrawings do pcall(function() ugvDrawings[i].box.Visible = false
-                ugvDrawings[i].text.Visible = false end) end
+            for i = #currentUgvs + 1, #ugvDrawings do pcall(function() 
+                ugvDrawings[i].box.Visible = false
+                ugvDrawings[i].text.Visible = false
+                if ugvDrawings[i].healthText then ugvDrawings[i].healthText.Visible = false end 
+                if ugvDrawings[i].chams then ugvDrawings[i].chams.Enabled = false end
+            end) end
         end
     end
 end))
