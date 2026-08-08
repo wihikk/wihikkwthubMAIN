@@ -55,6 +55,7 @@ local freecamActive = false
 local freecamKeys = {}
 
 local _antilag_sweep
+local restoreExplosions
 
 table.insert(scriptConnections, UserInputService.InputBegan:Connect(function(i, gp) if not gp then freecamKeys[i.KeyCode] = true end end))
 table.insert(scriptConnections, UserInputService.InputEnded:Connect(function(i) freecamKeys[i.KeyCode] = false end))
@@ -1619,40 +1620,70 @@ task.spawn(function()
     end
 end)
 
-local function killEffect(d)
+local hiddenEffectsCache = setmetatable({}, {__mode = "k"})
+local noExplosionsConns = {}
+
+local function applyNoExplosions(d, isExpFolder)
+    if not settings.noExplosions then return end
     if d:IsA("ParticleEmitter") or d:IsA("Trail") or d:IsA("Beam") or d:IsA("Smoke") or d:IsA("Fire") or d:IsA("Sparkles") then
-        if settings.noExplosions then d.Enabled = false end
-    end
-end
-_antilag_sweep = function()
-    for _, d in ipairs(workspace:GetDescendants()) do pcall(killEffect, d) end
-end
-table.insert(scriptConnections, workspace.DescendantAdded:Connect(function(d)
-    if settings.noExplosions then
-        pcall(killEffect, d)
-        if d:IsA("Explosion") then
-            d.Visible = false
-        elseif d:IsA("ParticleEmitter") or d:IsA("Fire") or d:IsA("Smoke") then
-            local exp = d:FindFirstAncestor("Explosions")
-            if exp then d.Enabled = false end
-        end
-    end
-end))
-local gs = workspace:FindFirstChild("Game Systems")
-local expFolder = gs and gs:FindFirstChild("Explosions")
-if expFolder then
-    table.insert(scriptConnections, expFolder.DescendantAdded:Connect(function(d)
-        if not settings.noExplosions then return end
-        if d:IsA("ParticleEmitter") or d:IsA("Fire") or d:IsA("Smoke") or d:IsA("Beam") then
+        if d.Enabled then
+            hiddenEffectsCache[d] = {prop = "Enabled", val = true}
             d.Enabled = false
-        elseif d:IsA("BasePart") then
+        end
+    elseif d:IsA("Explosion") then
+        if d.Visible ~= false then
+            hiddenEffectsCache[d] = {prop = "Visible", val = d.Visible}
+            d.Visible = false
+        end
+    elseif isExpFolder and d:IsA("BasePart") then
+        if d.Transparency ~= 1 then
+            hiddenEffectsCache[d] = {prop = "Transparency", val = d.Transparency}
             d.Transparency = 1
         end
-    end))
+    end
+end
+
+restoreExplosions = function()
+    for obj, data in pairs(hiddenEffectsCache) do
+        pcall(function()
+            if obj and obj.Parent then
+                obj[data.prop] = data.val
+            end
+        end)
+    end
+    table.clear(hiddenEffectsCache)
+    for _, c in ipairs(noExplosionsConns) do pcall(function() c:Disconnect() end) end
+    table.clear(noExplosionsConns)
+end
+
+_antilag_sweep = function()
+    task.spawn(function()
+        local gs = workspace:FindFirstChild("Game Systems")
+        local expFolder = gs and gs:FindFirstChild("Explosions")
+        local count = 0
+        local allDescendants = workspace:GetDescendants()
+        for _, d in ipairs(allDescendants) do
+            if not settings.noExplosions or not isScriptActive then break end
+            local isExpFolder = expFolder and d:IsDescendantOf(expFolder)
+            pcall(applyNoExplosions, d, isExpFolder)
+            count = count + 1
+            if count % 300 == 0 then RunService.Heartbeat:Wait() end
+        end
+    end)
 end
 
 createToggle("No Explosions & Particles", ClientGroup, "noExplosions", function(state)
-    if state and _antilag_sweep then _antilag_sweep() end
+    if state then
+        if _antilag_sweep then _antilag_sweep() end
+        table.insert(noExplosionsConns, workspace.DescendantAdded:Connect(function(d)
+            local gs = workspace:FindFirstChild("Game Systems")
+            local expFolder = gs and gs:FindFirstChild("Explosions")
+            local isExpFolder = expFolder and d:IsDescendantOf(expFolder)
+            pcall(applyNoExplosions, d, isExpFolder)
+        end))
+    else
+        if restoreExplosions then restoreExplosions() end
+    end
 end)
 
 local ConfigGroup = createGroup(Pages.MiscRight)
@@ -2122,6 +2153,8 @@ local function UnloadScript()
     
     for _, connection in pairs(scriptConnections) do pcall(function() connection:Disconnect() end) end
     table.clear(scriptConnections)
+    
+    if restoreExplosions then pcall(restoreExplosions) end
     
     for _, tw in ipairs(activeTweens) do pcall(function() tw:Cancel() end) end
     table.clear(activeTweens)
