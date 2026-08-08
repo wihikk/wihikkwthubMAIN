@@ -309,6 +309,7 @@ if not targetParent then targetParent = LocalPlayer:WaitForChild("PlayerGui") en
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "CustomOverlayMenu"
 ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
 pcall(function() if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end end)
 ScreenGui.Parent = targetParent
 
@@ -521,6 +522,24 @@ MainStroke.Thickness = 1.5
 MainStroke.Color = Theme.Border
 MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
+local HubBtn = Instance.new("TextButton", ScreenGui)
+HubBtn.Size = UDim2.new(0, 130, 0, 26)
+HubBtn.Position = UDim2.new(0, 15, 0, 70)
+HubBtn.BackgroundColor3 = Theme.PanelBG
+HubBtn.BackgroundTransparency = 1
+HubBtn.Text = "Hub"
+HubBtn.TextColor3 = Theme.Accent
+HubBtn.TextTransparency = 1
+HubBtn.Font = Enum.Font.GothamBold
+HubBtn.TextSize = 12
+HubBtn.Visible = false
+HubBtn.AutoButtonColor = false
+Instance.new("UICorner", HubBtn).CornerRadius = UDim.new(0, 6)
+local HubStroke = Instance.new("UIStroke", HubBtn)
+HubStroke.Color = Theme.Border
+HubStroke.Thickness = 1
+HubStroke.Transparency = 1
+
 local DevToolsBtn = Instance.new("TextButton", ScreenGui)
 DevToolsBtn.Size = UDim2.new(0, 100, 0, 26)
 DevToolsBtn.Position = UDim2.new(0, Frame.Position.X.Offset + 20, 0, Frame.Position.Y.Offset - 35)
@@ -543,7 +562,7 @@ Frame.Position = UDim2.new(0, 70, 0, 170)
 Frame.Visible = true
 DevToolsBtn.Visible = true
 
-local menuTw = TweenService:Create(Frame, TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, 490, 0, 530), Position = UDim2.new(0, 50, 0, 150)})
+local menuTw = TweenService:Create(Frame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 490, 0, 530), Position = UDim2.new(0, 50, 0, 150)})
 table.insert(activeTweens, menuTw)
 menuTw:Play()
 
@@ -552,30 +571,55 @@ local function ToggleMenu(forceState)
     if guiVisible then
         Frame.Visible = true
         DevToolsBtn.Visible = true
-        local tw = TweenService:Create(Frame, TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 600)})
+        
+        local twHub = TweenService:Create(HubBtn, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 1, TextTransparency = 1})
+        TweenService:Create(HubStroke, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 1}):Play()
+        twHub:Play()
+        twHub.Completed:Connect(function(state) if state == Enum.PlaybackState.Completed and guiVisible then HubBtn.Visible = false end end)
+
+        TweenService:Create(DevToolsBtn, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0, TextTransparency = 0}):Play()
+        TweenService:Create(DTStroke, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 0}):Play()
+
+        local tw = TweenService:Create(Frame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 600)})
         table.insert(activeTweens, tw)
         tw:Play()
     else
-        DevToolsBtn.Visible = false
-        local tw = TweenService:Create(Frame, TweenInfo.new(0.2, Enum.EasingStyle.Exponential, Enum.EasingDirection.In), {Size = UDim2.new(0, 520, 0, 0)})
+        HubBtn.Visible = true
+        TweenService:Create(HubBtn, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.15, TextTransparency = 0}):Play()
+        TweenService:Create(HubStroke, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 0}):Play()
+
+        TweenService:Create(DevToolsBtn, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {BackgroundTransparency = 1, TextTransparency = 1}):Play()
+        TweenService:Create(DTStroke, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Transparency = 1}):Play()
+        
+        local tw = TweenService:Create(Frame, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 520, 0, 0)})
         table.insert(activeTweens, tw)
         tw:Play()
-        tw.Completed:Connect(function(state) if state == Enum.PlaybackState.Completed and not guiVisible then Frame.Visible = false end end)
+        tw.Completed:Connect(function(state) 
+            if state == Enum.PlaybackState.Completed and not guiVisible then 
+                Frame.Visible = false 
+                DevToolsBtn.Visible = false
+            end 
+        end)
     end
 end
+
+HubBtn.MouseButton1Click:Connect(function()
+    ToggleMenu(true)
+end)
 
 local DevPassModal = Instance.new("Frame", ScreenGui)
 DevPassModal.Size = UDim2.new(1, 0, 1, 0)
 DevPassModal.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-DevPassModal.BackgroundTransparency = 0.7
+DevPassModal.BackgroundTransparency = 1
 DevPassModal.ZIndex = 60
 DevPassModal.Visible = false
 
 local DevPassWindow = Instance.new("Frame", DevPassModal)
-DevPassWindow.Size = UDim2.new(0, 220, 0, 110)
+DevPassWindow.Size = UDim2.new(0, 0, 0, 0)
 DevPassWindow.AnchorPoint = Vector2.new(0.5, 0.5)
 DevPassWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
 DevPassWindow.BackgroundColor3 = Theme.PanelBG
+DevPassWindow.ClipsDescendants = true
 DevPassWindow.ZIndex = 61
 Instance.new("UICorner", DevPassWindow).CornerRadius = UDim.new(0, 8)
 Instance.new("UIStroke", DevPassWindow).Color = Theme.Border
@@ -614,10 +658,11 @@ DPClose.TextSize = 14
 DPClose.ZIndex = 62
 
 local DevPanel = Instance.new("Frame", ScreenGui)
-DevPanel.Size = UDim2.new(0, 200, 0, 130)
-DevPanel.AnchorPoint = Vector2.new(0.5, 0.5)
-DevPanel.Position = UDim2.new(0.5, 0, 0.5, 0)
+DevPanel.Size = UDim2.new(0, 0, 0, 0)
+DevPanel.AnchorPoint = Vector2.new(1, 1)
+DevPanel.Position = UDim2.new(1, -30, 1, -30)
 DevPanel.BackgroundColor3 = Theme.PanelBG
+DevPanel.ClipsDescendants = true
 DevPanel.ZIndex = 70
 DevPanel.Visible = false
 Instance.new("UICorner", DevPanel).CornerRadius = UDim.new(0, 8)
@@ -807,27 +852,49 @@ end))
 
 DevToolsBtn.MouseButton1Click:Connect(function()
     if devToolsUnlocked then
-        DevPassModal.Visible = false
+        if DevPanel.Visible then return end
         DevPanel.Visible = true
+        DevPanel.Size = UDim2.new(0, 0, 0, 0)
+        TweenService:Create(DevPanel, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 200, 0, 130)}):Play()
     else
+        if DevPassModal.Visible then return end
         DPInput.Text = ""
         DevPassModal.Visible = true
+        DevPassModal.BackgroundTransparency = 1
+        TweenService:Create(DevPassModal, TweenInfo.new(0.3), {BackgroundTransparency = 0.7}):Play()
+        
+        DevPassWindow.Size = UDim2.new(0, 0, 0, 0)
+        TweenService:Create(DevPassWindow, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 220, 0, 110)}):Play()
+        
+        task.delay(0.05, function() DPInput:CaptureFocus() end)
     end
 end)
 
 DPClose.MouseButton1Click:Connect(function()
-    DevPassModal.Visible = false
+    TweenService:Create(DevPassModal, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
+    local tw = TweenService:Create(DevPassWindow, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)})
+    tw:Play()
+    tw.Completed:Connect(function() DevPassModal.Visible = false end)
 end)
 
 DPanelClose.MouseButton1Click:Connect(function()
-    DevPanel.Visible = false
+    local tw = TweenService:Create(DevPanel, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)})
+    tw:Play()
+    tw.Completed:Connect(function() DevPanel.Visible = false end)
 end)
 
 DPInput:GetPropertyChangedSignal("Text"):Connect(function()
     if DPInput.Text == "2458" then
         devToolsUnlocked = true
-        DevPassModal.Visible = false
+        
+        TweenService:Create(DevPassModal, TweenInfo.new(0.2), {BackgroundTransparency = 1}):Play()
+        local tw = TweenService:Create(DevPassWindow, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)})
+        tw:Play()
+        tw.Completed:Connect(function() DevPassModal.Visible = false end)
+        
         DevPanel.Visible = true
+        DevPanel.Size = UDim2.new(0, 0, 0, 0)
+        TweenService:Create(DevPanel, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 200, 0, 130)}):Play()
     end
 end)
 
@@ -858,6 +925,16 @@ TabList.FillDirection = Enum.FillDirection.Horizontal
 TabList.SortOrder = Enum.SortOrder.LayoutOrder
 TabList.Padding = UDim.new(0, 12)
 
+local IndicatorContainer = Instance.new("Frame", Frame)
+IndicatorContainer.Size = UDim2.new(1, -40, 0, 2)
+IndicatorContainer.Position = UDim2.new(0, 20, 0, 70)
+IndicatorContainer.BackgroundTransparency = 1
+
+local ActiveIndicator = Instance.new("Frame", IndicatorContainer)
+ActiveIndicator.Size = UDim2.new(0, 65, 1, 0)
+ActiveIndicator.BackgroundColor3 = Theme.Accent
+ActiveIndicator.BorderSizePixel = 0
+
 local Divider = Instance.new("Frame", Frame)
 Divider.Size = UDim2.new(1, -40, 0, 1)
 Divider.Position = UDim2.new(0, 20, 0, 75)
@@ -866,6 +943,7 @@ Divider.BorderSizePixel = 0
 
 local tabs = {}
 local activePage = nil
+local tabCount = 0
 
 local function createPage(name)
     local Page = Instance.new("Frame", Frame)
@@ -892,6 +970,9 @@ local function createPage(name)
 end
 
 local function createTabButton(name, pageObject, isDefault)
+    local idx = tabCount
+    tabCount = tabCount + 1
+    
     local Btn = Instance.new("TextButton", TabContainer)
     Btn.Size = UDim2.new(0, 65, 1, 0)
     Btn.BackgroundTransparency = 1
@@ -899,12 +980,6 @@ local function createTabButton(name, pageObject, isDefault)
     Btn.Font = Enum.Font.GothamBold
     Btn.TextSize = 13
     Btn.TextColor3 = isDefault and Theme.Accent or Theme.TextSub
-    local Indicator = Instance.new("Frame", Btn)
-    Indicator.Size = UDim2.new(1, 0, 0, 2)
-    Indicator.Position = UDim2.new(0, 0, 1, -2)
-    Indicator.BackgroundColor3 = Theme.Accent
-    Indicator.BorderSizePixel = 0
-    Indicator.Visible = isDefault
 
     Btn.MouseButton1Click:Connect(function()
         if activePage == pageObject then return end
@@ -917,10 +992,13 @@ local function createTabButton(name, pageObject, isDefault)
         local dir = (newIdx > oldIdx) and 1 or -1
         for _, tab in pairs(tabs) do 
             TweenService:Create(tab.btn, TweenInfo.new(0.15, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextColor3 = Theme.TextSub}):Play()
-            tab.ind.Visible = false 
         end
         TweenService:Create(Btn, TweenInfo.new(0.15, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextColor3 = Theme.Accent}):Play()
-        Indicator.Visible = true
+        
+        TweenService:Create(ActiveIndicator, TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+            Position = UDim2.new(0, idx * (65 + 12), 0, 0)
+        }):Play()
+        
         local oldPage = activePage
         activePage = pageObject
         if oldPage then
@@ -931,12 +1009,13 @@ local function createTabButton(name, pageObject, isDefault)
         pageObject.Visible = true
         TweenService:Create(pageObject, TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 85)}):Play()
     end)
-    table.insert(tabs, {btn = Btn, ind = Indicator, page = pageObject})
+    table.insert(tabs, {btn = Btn, page = pageObject})
     if isDefault then 
         activePage = pageObject
         pageObject.Position = UDim2.new(0, 0, 0, 85)
         pageObject.Visible = true 
         isMiscPageOpen = (name == "Misc")
+        ActiveIndicator.Position = UDim2.new(0, idx * (65 + 12), 0, 0)
     end
 end
 
@@ -980,7 +1059,7 @@ table.insert(scriptConnections, DevPanel.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement then devDragInput = input end
 end))
 table.insert(scriptConnections, UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and devDragging then
+    if input == devDragInput and devDragging then
         local delta = input.Position - devDragStart
         DevPanel.Position = UDim2.new(devStartPos.X.Scale, devStartPos.X.Offset + delta.X, devStartPos.Y.Scale, devStartPos.Y.Offset + delta.Y)
     end
