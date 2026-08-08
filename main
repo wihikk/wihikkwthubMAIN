@@ -61,11 +61,21 @@ table.insert(scriptConnections, UserInputService.InputEnded:Connect(function(i) 
 
 task.spawn(function()
     while isScriptActive and baseSpawnCFrame == nil do
-        local char = LocalPlayer.Character
-        if char then
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            if hrp and hrp.Position.Y > 0 then
-                baseSpawnCFrame = hrp.CFrame
+        if LocalPlayer.Team and string.lower(LocalPlayer.Team.Name) ~= "loading" then
+            local t = workspace:FindFirstChild("Tycoon")
+            t = t and t:FindFirstChild("Tycoons")
+            t = t and t:FindFirstChild(LocalPlayer.Team.Name)
+            local vis = t and t:FindFirstChild("Essentials") and t.Essentials:FindFirstChild("Spawn Visualizer")
+            if vis then
+                baseSpawnCFrame = vis.CFrame + Vector3.new(0, 3, 0)
+            else
+                local char = LocalPlayer.Character
+                if char then
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    if hrp and hrp.Position.Y > 0 then
+                        baseSpawnCFrame = hrp.CFrame
+                    end
+                end
             end
         end
         task.wait(0.5)
@@ -486,6 +496,70 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
         
         framesCount = 0
         lastStatsUpdate = now
+    end
+end))
+
+local VehHealthLabel = Instance.new("TextLabel", StatsGui)
+VehHealthLabel.Size = UDim2.new(0, 200, 0, 30)
+VehHealthLabel.AnchorPoint = Vector2.new(1, 1)
+VehHealthLabel.Position = UDim2.new(1, -30, 1, -60)
+VehHealthLabel.BackgroundTransparency = 1
+VehHealthLabel.Text = ""
+VehHealthLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+VehHealthLabel.Font = Enum.Font.GothamBold
+VehHealthLabel.TextSize = 18
+VehHealthLabel.TextXAlignment = Enum.TextXAlignment.Right
+VehHealthLabel.TextTransparency = 1
+VehHealthLabel.Visible = false
+local VehHealthStroke = Instance.new("UIStroke", VehHealthLabel)
+VehHealthStroke.Color = Color3.new(0, 0, 0)
+VehHealthStroke.Thickness = 1.5
+VehHealthStroke.Transparency = 1
+
+local isVehHealthVisible = false
+table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChild("Humanoid")
+    local seat = hum and hum.SeatPart
+    
+    local inVeh = false
+    local hpText = ""
+    local hpColor = Color3.fromRGB(100, 255, 100)
+    
+    if seat and (seat:IsA("VehicleSeat") or seat:IsA("Seat")) then
+        local model = seat:FindFirstAncestorOfClass("Model")
+        if model then
+            local isAlive, currentHp, hasHealth = checkEntityHealth(model)
+            if hasHealth then
+                inVeh = true
+                hpText = "Vehicle: " .. math.floor(currentHp) .. " HP"
+                if currentHp <= 30 then
+                    hpColor = Color3.fromRGB(255, 80, 80)
+                elseif currentHp <= 60 then
+                    hpColor = Color3.fromRGB(255, 200, 80)
+                end
+            end
+        end
+    end
+    
+    if inVeh and not isVehHealthVisible then
+        isVehHealthVisible = true
+        VehHealthLabel.Visible = true
+        VehHealthLabel.Text = hpText
+        VehHealthLabel.TextColor3 = hpColor
+        TweenService:Create(VehHealthLabel, TweenInfo.new(0.3), {TextTransparency = 0}):Play()
+        TweenService:Create(VehHealthStroke, TweenInfo.new(0.3), {Transparency = 0}):Play()
+    elseif not inVeh and isVehHealthVisible then
+        isVehHealthVisible = false
+        local tw = TweenService:Create(VehHealthLabel, TweenInfo.new(0.3), {TextTransparency = 1})
+        TweenService:Create(VehHealthStroke, TweenInfo.new(0.3), {Transparency = 1}):Play()
+        tw:Play()
+        tw.Completed:Connect(function()
+            if not isVehHealthVisible then VehHealthLabel.Visible = false end
+        end)
+    elseif inVeh and isVehHealthVisible then
+        VehHealthLabel.Text = hpText
+        VehHealthLabel.TextColor3 = hpColor
     end
 end))
 
@@ -1373,14 +1447,8 @@ local MiscCombatGroup = createGroup(Pages.CombatRight)
 createToggle("Click TP (LMB)", MiscCombatGroup, "clickTp")
 createDualActionButtons("TP to Base", "TP to Capture", MiscCombatGroup, 
     function()
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Team then
-            local t = workspace:FindFirstChild("Tycoon")
-            t = t and t:FindFirstChild("Tycoons")
-            t = t and t:FindFirstChild(LocalPlayer.Team.Name)
-            local vis = t and t:FindFirstChild("Essentials") and t.Essentials:FindFirstChild("Spawn Visualizer")
-            if vis then
-                LocalPlayer.Character.HumanoidRootPart.CFrame = vis.CFrame + Vector3.new(0, 3, 0)
-            elseif baseSpawnCFrame then
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            if baseSpawnCFrame then
                 LocalPlayer.Character.HumanoidRootPart.CFrame = baseSpawnCFrame
             end
         end
