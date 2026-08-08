@@ -30,10 +30,10 @@ local scriptConnections = {}
 local activeTweens = {}
 local isScriptActive = true
 local isLoaded = false
-local isLoadingConfig = false
 local baseSpawnCFrame = nil
 local customSpawnCFrame = nil
 local wasNoclip = false
+local wasFlying = false
 local isMiscPageOpen = false
 local devToolsUnlocked = false
 local activeTarget = nil
@@ -55,7 +55,6 @@ local freecamActive = false
 local freecamKeys = {}
 
 local _antilag_sweep
-local restoreExplosions
 
 table.insert(scriptConnections, UserInputService.InputBegan:Connect(function(i, gp) if not gp then freecamKeys[i.KeyCode] = true end end))
 table.insert(scriptConnections, UserInputService.InputEnded:Connect(function(i) freecamKeys[i.KeyCode] = false end))
@@ -489,23 +488,6 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
         lastStatsUpdate = now
     end
 end))
-
-local TpWarningLabel = Instance.new("TextLabel", ScreenGui)
-TpWarningLabel.Size = UDim2.new(0, 420, 0, 40)
-TpWarningLabel.AnchorPoint = Vector2.new(0.5, 0)
-TpWarningLabel.Position = UDim2.new(0.5, 0, 0, 50)
-TpWarningLabel.BackgroundColor3 = Theme.Background
-TpWarningLabel.BackgroundTransparency = 0.1
-TpWarningLabel.TextColor3 = Theme.TextMain
-TpWarningLabel.Font = Enum.Font.GothamBold
-TpWarningLabel.TextSize = 14
-TpWarningLabel.Text = "this tween tp is so slow so you don't get kicked"
-TpWarningLabel.Visible = false
-TpWarningLabel.ZIndex = 100
-Instance.new("UICorner", TpWarningLabel).CornerRadius = UDim.new(0, 8)
-local TpStroke = Instance.new("UIStroke", TpWarningLabel)
-TpStroke.Color = Theme.Border
-TpStroke.Thickness = 1.5
 
 local guiVisible = false
 
@@ -1620,70 +1602,40 @@ task.spawn(function()
     end
 end)
 
-local hiddenEffectsCache = setmetatable({}, {__mode = "k"})
-local noExplosionsConns = {}
-
-local function applyNoExplosions(d, isExpFolder)
-    if not settings.noExplosions then return end
+local function killEffect(d)
     if d:IsA("ParticleEmitter") or d:IsA("Trail") or d:IsA("Beam") or d:IsA("Smoke") or d:IsA("Fire") or d:IsA("Sparkles") then
-        if d.Enabled then
-            hiddenEffectsCache[d] = {prop = "Enabled", val = true}
-            d.Enabled = false
-        end
-    elseif d:IsA("Explosion") then
-        if d.Visible ~= false then
-            hiddenEffectsCache[d] = {prop = "Visible", val = d.Visible}
+        if settings.noExplosions then d.Enabled = false end
+    end
+end
+_antilag_sweep = function()
+    for _, d in ipairs(workspace:GetDescendants()) do pcall(killEffect, d) end
+end
+table.insert(scriptConnections, workspace.DescendantAdded:Connect(function(d)
+    if settings.noExplosions then
+        pcall(killEffect, d)
+        if d:IsA("Explosion") then
             d.Visible = false
+        elseif d:IsA("ParticleEmitter") or d:IsA("Fire") or d:IsA("Smoke") then
+            local exp = d:FindFirstAncestor("Explosions")
+            if exp then d.Enabled = false end
         end
-    elseif isExpFolder and d:IsA("BasePart") then
-        if d.Transparency ~= 1 then
-            hiddenEffectsCache[d] = {prop = "Transparency", val = d.Transparency}
+    end
+end))
+local gs = workspace:FindFirstChild("Game Systems")
+local expFolder = gs and gs:FindFirstChild("Explosions")
+if expFolder then
+    table.insert(scriptConnections, expFolder.DescendantAdded:Connect(function(d)
+        if not settings.noExplosions then return end
+        if d:IsA("ParticleEmitter") or d:IsA("Fire") or d:IsA("Smoke") or d:IsA("Beam") then
+            d.Enabled = false
+        elseif d:IsA("BasePart") then
             d.Transparency = 1
         end
-    end
-end
-
-restoreExplosions = function()
-    for obj, data in pairs(hiddenEffectsCache) do
-        pcall(function()
-            if obj and obj.Parent then
-                obj[data.prop] = data.val
-            end
-        end)
-    end
-    table.clear(hiddenEffectsCache)
-    for _, c in ipairs(noExplosionsConns) do pcall(function() c:Disconnect() end) end
-    table.clear(noExplosionsConns)
-end
-
-_antilag_sweep = function()
-    task.spawn(function()
-        local gs = workspace:FindFirstChild("Game Systems")
-        local expFolder = gs and gs:FindFirstChild("Explosions")
-        local count = 0
-        local allDescendants = workspace:GetDescendants()
-        for _, d in ipairs(allDescendants) do
-            if not settings.noExplosions or not isScriptActive then break end
-            local isExpFolder = expFolder and d:IsDescendantOf(expFolder)
-            pcall(applyNoExplosions, d, isExpFolder)
-            count = count + 1
-            if count % 300 == 0 then RunService.Heartbeat:Wait() end
-        end
-    end)
+    end))
 end
 
 createToggle("No Explosions & Particles", ClientGroup, "noExplosions", function(state)
-    if state then
-        if _antilag_sweep then _antilag_sweep() end
-        table.insert(noExplosionsConns, workspace.DescendantAdded:Connect(function(d)
-            local gs = workspace:FindFirstChild("Game Systems")
-            local expFolder = gs and gs:FindFirstChild("Explosions")
-            local isExpFolder = expFolder and d:IsDescendantOf(expFolder)
-            pcall(applyNoExplosions, d, isExpFolder)
-        end))
-    else
-        if restoreExplosions then restoreExplosions() end
-    end
+    if state and _antilag_sweep then _antilag_sweep() end
 end)
 
 local ConfigGroup = createGroup(Pages.MiscRight)
@@ -1835,7 +1787,6 @@ local function doLoadConfig()
     if readfile and isfile then
         pcall(function()
             if isfile("PlayerCfg_"..currentConfigName..".json") then
-                isLoadingConfig = true
                 local decoded = HttpService:JSONDecode(readfile("PlayerCfg_"..currentConfigName..".json"))
                 for k, v in pairs(decoded) do
                     if k == "binds" then
@@ -1847,10 +1798,8 @@ local function doLoadConfig()
                         if uiUpdaters[k] then uiUpdaters[k](v) else settings[k] = v end
                     end
                 end
-                isLoadingConfig = false
             end
         end)
-        isLoadingConfig = false
     end
 end
 
@@ -2033,7 +1982,6 @@ task.spawn(function()
                 currentConfigName = cfgNames[1]
                 if ConfigTextBox then ConfigTextBox.Text = currentConfigName end
                 if isfile("PlayerCfg_"..currentConfigName..".json") then
-                    isLoadingConfig = true
                     local decoded = HttpService:JSONDecode(readfile("PlayerCfg_"..currentConfigName..".json"))
                     for k, v in pairs(decoded) do
                         if k == "binds" then
@@ -2045,7 +1993,6 @@ task.spawn(function()
                             if uiUpdaters[k] then uiUpdaters[k](v) else settings[k] = v end
                         end
                     end
-                    isLoadingConfig = false
                 end
             end
         end)
@@ -2153,8 +2100,6 @@ local function UnloadScript()
     
     for _, connection in pairs(scriptConnections) do pcall(function() connection:Disconnect() end) end
     table.clear(scriptConnections)
-    
-    if restoreExplosions then pcall(restoreExplosions) end
     
     for _, tw in ipairs(activeTweens) do pcall(function() tw:Cancel() end) end
     table.clear(activeTweens)
@@ -2288,6 +2233,7 @@ table.insert(scriptConnections, RunService.Stepped:Connect(function()
 
     if hrp then
         if doingFly then
+            wasFlying = true
             if hum then
                 hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
                 hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
@@ -2306,7 +2252,8 @@ table.insert(scriptConnections, RunService.Stepped:Connect(function()
             if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir = moveDir - Vector3.new(0, 1, 0) end
             bv.Velocity = moveDir.Magnitude > 0 and moveDir.Unit * settings.flySpeed or Vector3.new(0, 0, 0)
             bg.CFrame = Camera.CFrame
-        else
+        elseif wasFlying then
+            wasFlying = false
             if hum then
                 hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
                 hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
@@ -2369,130 +2316,157 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
     local trackDist = settings.aimbot and settings.fov or 150
     local closestForDamage = nil
     
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-            if not settings.teamCheck or player.Team ~= LocalPlayer.Team then
-                local pos, onScreen = Camera:WorldToViewportPoint(player.Character.Head.Position)
-                if onScreen and pos.Z > 0 then
-                    local dist = (mouseLoc - Vector2.new(pos.X, pos.Y)).Magnitude
-                    if dist <= trackDist then
-                        if not settings.aimbot or not settings.wallCheck or checkVisibility(player.Character) then
-                            trackDist = dist
-                            closestForDamage = player
+    if settings.aimbot then
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+                if not settings.teamCheck or player.Team ~= LocalPlayer.Team then
+                    local pos, onScreen = Camera:WorldToViewportPoint(player.Character.Head.Position)
+                    if onScreen and pos.Z > 0 then
+                        local dist = (mouseLoc - Vector2.new(pos.X, pos.Y)).Magnitude
+                        if dist <= trackDist then
+                            if not settings.wallCheck or checkVisibility(player.Character) then
+                                trackDist = dist
+                                closestForDamage = player
+                            end
                         end
                     end
                 end
             end
         end
+        activeTarget = closestForDamage
+
+        if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) and activeTarget then
+            targetLocked = true 
+            local aimPos = activeTarget.Character.Head.Position
+            if settings.predict and activeTarget.Character:FindFirstChild("HumanoidRootPart") then
+                aimPos = aimPos + (activeTarget.Character.HumanoidRootPart.AssemblyLinearVelocity * (settings.predictStrength / 100))
+            end
+            local targetCFrame = CFrame.new(Camera.CFrame.Position, aimPos)
+            Camera.CFrame = settings.smoothness > 0 and Camera.CFrame:Lerp(targetCFrame, math.clamp((100 - settings.smoothness) / 100, 0.02, 1)) or targetCFrame
+        end
+    else
+        activeTarget = nil
     end
-    activeTarget = closestForDamage
 
-    if settings.aimbot and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) and activeTarget then
-        targetLocked = true 
-        local aimPos = activeTarget.Character.Head.Position
-        if settings.predict and activeTarget.Character:FindFirstChild("HumanoidRootPart") then
-            aimPos = aimPos + (activeTarget.Character.HumanoidRootPart.AssemblyLinearVelocity * (settings.predictStrength / 100))
-        end
-        local targetCFrame = CFrame.new(Camera.CFrame.Position, aimPos)
-        Camera.CFrame = settings.smoothness > 0 and Camera.CFrame:Lerp(targetCFrame, math.clamp((100 - settings.smoothness) / 100, 0.02, 1)) or targetCFrame
-    end
+    if settings.esp or settings.tracers or settings.chams then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player == LocalPlayer then continue end
+            if not espObjects[player] then
+                espObjects[player] = {
+                    box = createDrawing("Square", {Thickness = 1, Visible = false}),
+                    health = createDrawing("Text", {Center = true, Size = 13, Font = 2, Color = Color3.fromRGB(100, 255, 100), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
+                    team = createDrawing("Text", {Center = true, Size = 13, Font = 2, Color = Color3.new(1,1,1), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
+                    name = createDrawing("Text", {Center = true, Size = 13, Font = 2, Color = Color3.new(1,1,1), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
+                    dist = createDrawing("Text", {Center = true, Size = 11, Font = 2, Color = Color3.new(1,1,1), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
+                    chams = Instance.new("Highlight")
+                }
+                espObjects[player].chams.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                espObjects[player].chams.FillTransparency = 0.5
+                espObjects[player].chams.OutlineTransparency = 0
+                pcall(function() espObjects[player].chams.Parent = game:GetService("CoreGui") end)
+                tracerObjects[player] = createDrawing("Line", {Thickness = 1, Visible = false})
+            end
 
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player == LocalPlayer then continue end
-        if not espObjects[player] then
-            espObjects[player] = {
-                box = createDrawing("Square", {Thickness = 1, Visible = false}),
-                health = createDrawing("Text", {Center = true, Size = 13, Font = 2, Color = Color3.fromRGB(100, 255, 100), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
-                team = createDrawing("Text", {Center = true, Size = 13, Font = 2, Color = Color3.new(1,1,1), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
-                name = createDrawing("Text", {Center = true, Size = 13, Font = 2, Color = Color3.new(1,1,1), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
-                dist = createDrawing("Text", {Center = true, Size = 11, Font = 2, Color = Color3.new(1,1,1), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
-                chams = Instance.new("Highlight")
-            }
-            espObjects[player].chams.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-            espObjects[player].chams.FillTransparency = 0.5
-            espObjects[player].chams.OutlineTransparency = 0
-            pcall(function() espObjects[player].chams.Parent = game:GetService("CoreGui") end)
-            tracerObjects[player] = createDrawing("Line", {Thickness = 1, Visible = false})
-        end
+            local esp = espObjects[player]
+            local tracer = tracerObjects[player]
+            local char = player.Character
 
-        local esp = espObjects[player]
-        local tracer = tracerObjects[player]
-        local char = player.Character
+            local isHiddenByVehicle = false
+            if settings.vehicleEsp and char and char:FindFirstChild("Humanoid") and char.Humanoid.SeatPart then
+                isHiddenByVehicle = true
+            end
 
-        local isHiddenByVehicle = false
-        if settings.vehicleEsp and char and char:FindFirstChild("Humanoid") and char.Humanoid.SeatPart then
-            isHiddenByVehicle = true
-        end
+            if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Head") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 and (not settings.teamCheck or player.Team ~= LocalPlayer.Team) and (player.Team == nil or string.lower(player.Team.Name) ~= "loading") and not isHiddenByVehicle then
+                local tColor = player.Team and player.Team.TeamColor.Color or Color3.fromRGB(255, 60, 60)
+                local tName = player.Team and player.Team.Name or "No Team"
 
-        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Head") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 and (not settings.teamCheck or player.Team ~= LocalPlayer.Team) and (player.Team == nil or string.lower(player.Team.Name) ~= "loading") and not isHiddenByVehicle then
-            local rPos = char.HumanoidRootPart.Position
-            local b2d, onB = Camera:WorldToViewportPoint(rPos - Vector3.new(0, 3, 0))
-            local t2d, onT = Camera:WorldToViewportPoint(char.Head.Position + Vector3.new(0, 0.5, 0))
-            local r2d, onR = Camera:WorldToViewportPoint(rPos)
-            local tColor = player.Team and player.Team.TeamColor.Color or Color3.fromRGB(255, 60, 60)
-            local tName = player.Team and player.Team.Name or "No Team"
+                if settings.chams then
+                    esp.chams.Adornee = char
+                    esp.chams.FillColor = tColor
+                    esp.chams.OutlineColor = Color3.new(1,1,1)
+                    esp.chams.Enabled = true
+                else
+                    esp.chams.Enabled = false
+                end
 
-            if settings.tracers and onR and r2d.Z > 0 then
-                tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                tracer.To = Vector2.new(r2d.X, r2d.Y)
-                tracer.Color = tColor
-                tracer.Visible = true
-            else tracer.Visible = false end
+                if settings.esp or settings.tracers then
+                    local rPos = char.HumanoidRootPart.Position
+                    local b2d, onB = Camera:WorldToViewportPoint(rPos - Vector3.new(0, 3, 0))
+                    local t2d, onT = Camera:WorldToViewportPoint(char.Head.Position + Vector3.new(0, 0.5, 0))
+                    local r2d, onR = Camera:WorldToViewportPoint(rPos)
 
-            if settings.chams then
-                esp.chams.Adornee = char
-                esp.chams.FillColor = tColor
-                esp.chams.OutlineColor = Color3.new(1,1,1)
-                esp.chams.Enabled = true
+                    if settings.tracers and onR and r2d.Z > 0 then
+                        tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                        tracer.To = Vector2.new(r2d.X, r2d.Y)
+                        tracer.Color = tColor
+                        tracer.Visible = true
+                    else tracer.Visible = false end
+
+                    if settings.esp and (onB or onT) and b2d.Z > 0 then
+                        local h = math.abs(b2d.Y - t2d.Y)
+                        local w = h / 1.5
+                        
+                        esp.box.Size = Vector2.new(w, h)
+                        esp.box.Position = Vector2.new(t2d.X - w/2, t2d.Y)
+                        esp.box.Color = tColor; esp.box.Visible = settings.espBoxes
+                        
+                        esp.health.Text = math.floor(char.Humanoid.Health).." HP"
+                        esp.health.Position = Vector2.new(t2d.X - w/2 - 25, t2d.Y + (h/2) - 6)
+                        esp.health.Visible = settings.espHealth
+                        
+                        esp.team.Text = tName
+                        esp.team.Color = settings.espTeamsWhite and Color3.new(1, 1, 1) or tColor
+                        esp.team.Position = Vector2.new(t2d.X, t2d.Y - 16)
+                        esp.team.Visible = settings.espTeams
+                        
+                        local tool = char:FindFirstChildOfClass("Tool")
+                        local nText = player.Name
+                        if tool then nText = nText .. "\n[" .. tool.Name .. "]" end
+                        
+                        esp.name.Text = nText
+                        esp.name.Position = Vector2.new(t2d.X, t2d.Y + h + 3)
+                        esp.name.Visible = settings.espNames
+
+                        local nameOffset = tool and 28 or 14
+                        esp.dist.Text = math.floor((Camera.CFrame.Position - rPos).Magnitude).."m"
+                        esp.dist.Position = Vector2.new(t2d.X, t2d.Y + h + 3 + nameOffset)
+                        esp.dist.Visible = settings.espDist
+                    else
+                        esp.box.Visible = false
+                        esp.health.Visible = false
+                        esp.team.Visible = false
+                        esp.name.Visible = false
+                        esp.dist.Visible = false
+                    end
+                else
+                    esp.box.Visible = false
+                    esp.health.Visible = false
+                    esp.team.Visible = false
+                    esp.name.Visible = false
+                    esp.dist.Visible = false
+                    tracer.Visible = false
+                end
             else
+                esp.box.Visible = false
+                esp.health.Visible = false
+                esp.team.Visible = false
+                esp.name.Visible = false
+                esp.dist.Visible = false
                 esp.chams.Enabled = false
+                tracer.Visible = false
             end
-
-            if settings.esp and (onB or onT) and b2d.Z > 0 then
-                local h = math.abs(b2d.Y - t2d.Y)
-                local w = h / 1.5
-                
-                esp.box.Size = Vector2.new(w, h)
-                esp.box.Position = Vector2.new(t2d.X - w/2, t2d.Y)
-                esp.box.Color = tColor; esp.box.Visible = settings.espBoxes
-                
-                esp.health.Text = math.floor(char.Humanoid.Health).." HP"
-                esp.health.Position = Vector2.new(t2d.X - w/2 - 25, t2d.Y + (h/2) - 6)
-                esp.health.Visible = settings.espHealth
-                
-                esp.team.Text = tName
-                esp.team.Color = settings.espTeamsWhite and Color3.new(1, 1, 1) or tColor
-                esp.team.Position = Vector2.new(t2d.X, t2d.Y - 16)
-                esp.team.Visible = settings.espTeams
-                
-                local tool = char:FindFirstChildOfClass("Tool")
-                local nText = player.Name
-                if tool then nText = nText .. "\n[" .. tool.Name .. "]" end
-                
-                esp.name.Text = nText
-                esp.name.Position = Vector2.new(t2d.X, t2d.Y + h + 3)
-                esp.name.Visible = settings.espNames
-
-                local nameOffset = tool and 28 or 14
-                esp.dist.Text = math.floor((Camera.CFrame.Position - rPos).Magnitude).."m"
-                esp.dist.Position = Vector2.new(t2d.X, t2d.Y + h + 3 + nameOffset)
-                esp.dist.Visible = settings.espDist
-            else
-                esp.box.Visible=false
-                esp.health.Visible=false
-                esp.team.Visible=false
-                esp.name.Visible=false
-                esp.dist.Visible=false
-                tracer.Visible=false
-            end
-        else
-            esp.box.Visible=false
-            esp.health.Visible=false
-            esp.team.Visible=false
-            esp.name.Visible=false
-            esp.dist.Visible=false
-            esp.chams.Enabled=false
-            tracer.Visible=false
+        end
+    else
+        for _, esp in pairs(espObjects) do
+            esp.box.Visible = false
+            esp.health.Visible = false
+            esp.team.Visible = false
+            esp.name.Visible = false
+            esp.dist.Visible = false
+            esp.chams.Enabled = false
+        end
+        for _, tracer in pairs(tracerObjects) do
+            tracer.Visible = false
         end
     end
 
