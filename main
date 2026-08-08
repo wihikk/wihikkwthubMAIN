@@ -13,7 +13,7 @@ local Mouse = LocalPlayer:GetMouse()
 local settings = {
     aimbot = false, wallCheck = false, fov = 120, smoothness = 0,
     predict = true, predictStrength = 5,
-    shootWhileSprinting = false,
+    shootWhileSprinting = false, hitboxExpander = false, hitboxSize = 5,
     esp = true, espBoxes = true, espHealth = true, espDist = true, espNames = true, espTeams = true, espTeamsWhite = true,
     tracers = false, chams = false, clickTp = false,
     vehicleEsp = false, submarineEsp = true, uavEsp = true, 
@@ -119,6 +119,35 @@ local function findChildLower(parent, name)
     return nil
 end
 
+local function resetHitboxes()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            pcall(function()
+                local head = player.Character.Head
+                head.Size = Vector3.new(1.2, 1.2, 1.2)
+                head.Transparency = 0
+            end)
+        end
+    end
+end
+
+table.insert(scriptConnections, RunService.Heartbeat:Connect(function()
+    if settings.hitboxExpander then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid") then
+                if player.Character.Humanoid.Health > 0 and (not settings.teamCheck or player.Team ~= LocalPlayer.Team) then
+                    pcall(function()
+                        local head = player.Character.Head
+                        head.Size = Vector3.new(settings.hitboxSize, settings.hitboxSize, settings.hitboxSize)
+                        head.Transparency = 0.7
+                        head.CanCollide = false
+                    end)
+                end
+            end
+        end
+    end
+end))
+
 local function getEntityData(model)
     if not model then return nil end
     if entityDataCache[model] then return entityDataCache[model] end
@@ -158,13 +187,16 @@ local function getEntityData(model)
             if p.Transparency < 1 and not string.find(string.lower(p.Name), "rotor") then
                 local lp = aCf:PointToObjectSpace(p.Position)
                 local hs = p.Size / 2
-                mx = math.min(mx, lp.X - hs.X)
-                my = math.min(my, lp.Y - hs.Y)
-                mz = math.min(mz, lp.Z - hs.Z)
-                MXX = math.max(MXX, lp.X + hs.X)
-                MYY = math.max(MYY, lp.Y + hs.Y)
-                MZZ = math.max(MZZ, lp.Z + hs.Z)
-                fnd = true
+                
+                if p.Size.Magnitude < 200 and lp.Magnitude < 200 then
+                    mx = math.min(mx, lp.X - hs.X)
+                    my = math.min(my, lp.Y - hs.Y)
+                    mz = math.min(mz, lp.Z - hs.Z)
+                    MXX = math.max(MXX, lp.X + hs.X)
+                    MYY = math.max(MYY, lp.Y + hs.Y)
+                    MZZ = math.max(MZZ, lp.Z + hs.Z)
+                    fnd = true
+                end
             end
         end
         
@@ -1444,6 +1476,10 @@ end)
 createSlider("Walkspeed Value", MovementGroup, 16, 500, settings.walkspeedValue, 1, "walkspeedValue")
 
 local MiscCombatGroup = createGroup(Pages.CombatRight)
+createToggle("Hitbox Expander", MiscCombatGroup, "hitboxExpander", function(state)
+    if not state then resetHitboxes() end
+end)
+createSlider("Hitbox Size", MiscCombatGroup, 2, 50, settings.hitboxSize, 1, "hitboxSize")
 createToggle("Click TP (LMB)", MiscCombatGroup, "clickTp")
 createDualActionButtons("TP to Base", "TP to Capture", MiscCombatGroup, 
     function()
@@ -2231,6 +2267,8 @@ local function UnloadScript()
             Camera.CameraType = Enum.CameraType.Custom
         end
     end
+    
+    resetHitboxes()
 end
 
 local targetFps = 60
