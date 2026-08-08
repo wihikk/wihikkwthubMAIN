@@ -113,10 +113,13 @@ local function getEntityData(model)
     if not model then return nil end
     if entityDataCache[model] then return entityDataCache[model] end
     
-    local data = { seats = {}, healthNode = nil, hasHealth = false, owner = model:GetAttribute("Owner"), team = model:GetAttribute("Team") }
+    local data = { seats = {}, healthNode = nil, hasHealth = false, owner = model:GetAttribute("Owner"), team = model:GetAttribute("Team"), anchor = nil, offset = CFrame.new(), size = Vector3.new() }
+    local parts = {}
+
     for _, d in ipairs(model:GetDescendants()) do
         if d:IsA("VehicleSeat") or d:IsA("Seat") then
             table.insert(data.seats, d)
+            if not data.anchor then data.anchor = d end
         elseif not data.healthNode then
             if d:IsA("Humanoid") then
                 data.healthNode = d
@@ -126,7 +129,49 @@ local function getEntityData(model)
                 data.hasHealth = true
             end
         end
+        if d:IsA("BasePart") then
+            table.insert(parts, d)
+        end
     end
+
+    if not data.anchor then 
+        data.anchor = model.PrimaryPart or parts[1] 
+    end
+
+    if data.anchor then
+        local mx, my, mz = math.huge, math.huge, math.huge
+        local MXX, MYY, MZZ = -math.huge, -math.huge, -math.huge
+        local fnd = false
+        local aCf = data.anchor.CFrame
+        
+        for _, p in ipairs(parts) do
+            if p.Transparency < 1 and not string.find(string.lower(p.Name), "rotor") then
+                local lp = aCf:PointToObjectSpace(p.Position)
+                local hs = p.Size / 2
+                mx = math.min(mx, lp.X - hs.X)
+                my = math.min(my, lp.Y - hs.Y)
+                mz = math.min(mz, lp.Z - hs.Z)
+                MXX = math.max(MXX, lp.X + hs.X)
+                MYY = math.max(MYY, lp.Y + hs.Y)
+                MZZ = math.max(MZZ, lp.Z + hs.Z)
+                fnd = true
+            end
+        end
+        
+        if fnd then
+            data.offset = CFrame.new((MXX + mx)/2, (MYY + my)/2, (MZZ + mz)/2)
+            data.size = Vector3.new(MXX - mx, MYY - my, MZZ - mz)
+        else
+            local bbCf, bbSz = model:GetBoundingBox()
+            data.offset = data.anchor.CFrame:ToObjectSpace(bbCf)
+            data.size = bbSz
+        end
+    else
+        local bbCf, bbSz = model:GetBoundingBox()
+        data.offset = bbCf
+        data.size = bbSz
+    end
+
     entityDataCache[model] = data
     return data
 end
@@ -2375,7 +2420,13 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                         local cf, size = seat.CFrame, seat.Size
                         local name = "Vehicle"
                         if model then 
-                            cf, size = model:GetBoundingBox()
+                            local mData = getEntityData(model)
+                            if mData and mData.anchor then
+                                cf = mData.anchor.CFrame * mData.offset
+                                size = mData.size
+                            else
+                                cf, size = model:GetBoundingBox()
+                            end
                             name = model.Name 
                         end
                         
@@ -2503,30 +2554,6 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
         end
 
         if settings.submarineEsp then
-            local function getVisBB(mdl)
-                local mx, my, mz = math.huge, math.huge, math.huge
-                local MXX, MYY, MZZ = -math.huge, -math.huge, -math.huge
-                local fnd = false
-                local prim = mdl.PrimaryPart or mdl:FindFirstChildWhichIsA("BasePart")
-                if not prim then return mdl:GetBoundingBox() end
-                local cCf = prim.CFrame
-                for _, p in ipairs(mdl:GetDescendants()) do
-                    if p:IsA("BasePart") and p.Transparency < 1 then
-                        local lp = cCf:PointToObjectSpace(p.Position)
-                        local hs = p.Size / 2
-                        mx = math.min(mx, lp.X - hs.X)
-                        my = math.min(my, lp.Y - hs.Y)
-                        mz = math.min(mz, lp.Z - hs.Z)
-                        MXX = math.max(MXX, lp.X + hs.X)
-                        MYY = math.max(MYY, lp.Y + hs.Y)
-                        MZZ = math.max(MZZ, lp.Z + hs.Z)
-                        fnd = true
-                    end
-                end
-                if fnd then return cCf * CFrame.new((MXX + mx)/2, (MYY + my)/2, (MZZ + mz)/2), Vector3.new(MXX - mx, MYY - my, MZZ - mz) end
-                return mdl:GetBoundingBox()
-            end
-
             local currentSubs = {}
             for _, obj in ipairs(sysCache.subs) do if obj:IsA("Model") then table.insert(currentSubs, obj) end end
             for i, model in ipairs(currentSubs) do
@@ -2559,7 +2586,13 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                     local hTxt = ""
                     if hasHealth then hTxt = math.floor(currentHp) .. " HP" end
                     
-                    local cf, size = getVisBB(model)
+                    local cf, size = model:GetBoundingBox()
+                    local mData = getEntityData(model)
+                    if mData and mData.anchor then
+                        cf = mData.anchor.CFrame * mData.offset
+                        size = mData.size
+                    end
+                    
                     local bbox = get2DBoundingBox(cf, size, 0.65)
                     
                     if bbox then
@@ -2652,6 +2685,12 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                     if hasHealth then hTxt = math.floor(currentHp) .. " HP" end
                     
                     local cf, size = model:GetBoundingBox()
+                    local mData = getEntityData(model)
+                    if mData and mData.anchor then
+                        cf = mData.anchor.CFrame * mData.offset
+                        size = mData.size
+                    end
+                    
                     local bbox = get2DBoundingBox(cf, size, 0.5)
 
                     if bbox then
@@ -2744,6 +2783,12 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                     if hasHealth then hTxt = math.floor(currentHp) .. " HP" end
                     
                     local cf, size = model:GetBoundingBox()
+                    local mData = getEntityData(model)
+                    if mData and mData.anchor then
+                        cf = mData.anchor.CFrame * mData.offset
+                        size = mData.size
+                    end
+                    
                     local bbox = get2DBoundingBox(cf, size, 0.65)
                     
                     if bbox then
