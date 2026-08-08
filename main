@@ -178,12 +178,6 @@ ScreenGui.ResetOnSpawn = false
 pcall(function() if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end end)
 ScreenGui.Parent = targetParent
 
-local LoadingGui = Instance.new("ScreenGui")
-LoadingGui.Name = "CustomLoadingOverlay"
-LoadingGui.ResetOnSpawn = false
-pcall(function() if syn and syn.protect_gui then syn.protect_gui(LoadingGui) end end)
-LoadingGui.Parent = targetParent
-
 local StatsGui = Instance.new("ScreenGui")
 StatsGui.Name = "CustomStatsOverlay"
 StatsGui.ResetOnSpawn = false
@@ -348,38 +342,6 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
     end
 end))
 
-local LoadingFrame = Instance.new("Frame", LoadingGui)
-LoadingFrame.Size = UDim2.new(0, 220, 0, 55)
-LoadingFrame.AnchorPoint = Vector2.new(0.5, 0)
-LoadingFrame.Position = UDim2.new(0.5, 0, 0, 20)
-LoadingFrame.BackgroundColor3 = Theme.PanelBG
-LoadingFrame.BackgroundTransparency = 0.1
-Instance.new("UICorner", LoadingFrame).CornerRadius = UDim.new(0, 8)
-local LStroke = Instance.new("UIStroke", LoadingFrame)
-LStroke.Color = Theme.Border
-LStroke.Thickness = 1.5
-
-local LoadingText = Instance.new("TextLabel", LoadingFrame)
-LoadingText.Size = UDim2.new(1, 0, 0, 20)
-LoadingText.Position = UDim2.new(0, 0, 0, 8)
-LoadingText.BackgroundTransparency = 1
-LoadingText.Text = "Loading..."
-LoadingText.TextColor3 = Theme.Accent
-LoadingText.Font = Enum.Font.GothamBold
-LoadingText.TextSize = 13
-
-local LoadBarBG = Instance.new("Frame", LoadingFrame)
-LoadBarBG.Size = UDim2.new(1, -30, 0, 6)
-LoadBarBG.AnchorPoint = Vector2.new(0.5, 0)
-LoadBarBG.Position = UDim2.new(0.5, 0, 0, 35)
-LoadBarBG.BackgroundColor3 = Theme.OffColor
-Instance.new("UICorner", LoadBarBG).CornerRadius = UDim.new(1, 0)
-
-local LoadBarFill = Instance.new("Frame", LoadBarBG)
-LoadBarFill.Size = UDim2.new(0, 0, 1, 0)
-LoadBarFill.BackgroundColor3 = Theme.Accent
-Instance.new("UICorner", LoadBarFill).CornerRadius = UDim.new(1, 0)
-
 local TpWarningLabel = Instance.new("TextLabel", ScreenGui)
 TpWarningLabel.Size = UDim2.new(0, 420, 0, 40)
 TpWarningLabel.AnchorPoint = Vector2.new(0.5, 0)
@@ -427,45 +389,17 @@ local DTStroke = Instance.new("UIStroke", DevToolsBtn)
 DTStroke.Color = Theme.Border
 DTStroke.Thickness = 1
 
-local loadTw = TweenService:Create(LoadBarFill, TweenInfo.new(1.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(1, 0, 1, 0)})
-table.insert(activeTweens, loadTw)
-loadTw:Play()
+isLoaded = true
+guiVisible = true
 
-loadTw.Completed:Connect(function()
-    if not isScriptActive then return end
-    LoadingText.Text = "Loaded!"
-    task.wait(0.3)
-    if not isScriptActive then return end
-    
-    local fadeOut1 = TweenService:Create(LoadingFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1})
-    local fadeOut2 = TweenService:Create(LoadingText, TweenInfo.new(0.5), {TextTransparency = 1})
-    local fadeOut3 = TweenService:Create(LStroke, TweenInfo.new(0.5), {Transparency = 1})
-    local fadeOut4 = TweenService:Create(LoadBarBG, TweenInfo.new(0.5), {BackgroundTransparency = 1})
-    local fadeOut5 = TweenService:Create(LoadBarFill, TweenInfo.new(0.5), {BackgroundTransparency = 1})
-    
-    table.insert(activeTweens, fadeOut1)
-    table.insert(activeTweens, fadeOut2)
-    table.insert(activeTweens, fadeOut3)
-    table.insert(activeTweens, fadeOut4)
-    table.insert(activeTweens, fadeOut5)
-    
-    fadeOut1:Play(); fadeOut2:Play(); fadeOut3:Play(); fadeOut4:Play(); fadeOut5:Play()
-    fadeOut1.Completed:Wait()
-    
-    if not isScriptActive then return end
-    LoadingGui.Enabled = false
-    isLoaded = true
-    guiVisible = true
-    
-    Frame.Size = UDim2.new(0, 480, 0, 0)
-    Frame.Position = UDim2.new(0, 70, 0, 170)
-    Frame.Visible = true
-    DevToolsBtn.Visible = true
-    
-    local menuTw = TweenService:Create(Frame, TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 600), Position = UDim2.new(0, 50, 0, 150)})
-    table.insert(activeTweens, menuTw)
-    menuTw:Play()
-end)
+Frame.Size = UDim2.new(0, 480, 0, 0)
+Frame.Position = UDim2.new(0, 70, 0, 170)
+Frame.Visible = true
+DevToolsBtn.Visible = true
+
+local menuTw = TweenService:Create(Frame, TweenInfo.new(0.35, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 600), Position = UDim2.new(0, 50, 0, 150)})
+table.insert(activeTweens, menuTw)
+menuTw:Play()
 
 local function ToggleMenu(forceState)
     if forceState ~= nil then guiVisible = forceState else guiVisible = not guiVisible end
@@ -1934,7 +1868,6 @@ local function UnloadScript()
     
     pcall(function() VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game) end)
     
-    pcall(function() LoadingGui:Destroy() end)
     pcall(function() ScreenGui:Destroy() end)
     pcall(function() StatsGui:Destroy() end)
     pcall(function() NotifGui:Destroy() end)
@@ -2157,7 +2090,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
         local tracer = tracerObjects[player]
         local char = player.Character
 
-        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Head") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 and (not settings.teamCheck or player.Team ~= LocalPlayer.Team) then
+        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Head") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 and (not settings.teamCheck or player.Team ~= LocalPlayer.Team) and (player.Team == nil or string.lower(player.Team.Name) ~= "loading") then
             local rPos = char.HumanoidRootPart.Position
             local b2d, onB = Camera:WorldToViewportPoint(rPos - Vector3.new(0, 3, 0))
             local t2d, onT = Camera:WorldToViewportPoint(char.Head.Position + Vector3.new(0, 0.5, 0))
