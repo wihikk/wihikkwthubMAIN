@@ -417,10 +417,10 @@ local NotifPadding = Instance.new("UIPadding", NotifContainer)
 NotifPadding.PaddingBottom = UDim.new(0, 20)
 
 local Theme = {
-    Background = Color3.fromRGB(12, 12, 16), BackgroundTrans = 0.15,
-    PanelBG = Color3.fromRGB(20, 20, 26), PanelTrans = 0.1,
-    Accent = Color3.fromRGB(120, 100, 255), TextMain = Color3.fromRGB(245, 245, 250),
-    TextSub = Color3.fromRGB(160, 160, 175), Border = Color3.fromRGB(50, 50, 65), OffColor = Color3.fromRGB(28, 28, 36)
+    Background = Color3.fromRGB(10, 10, 14), BackgroundTrans = 0.15,
+    PanelBG = Color3.fromRGB(18, 18, 24), PanelTrans = 0.1,
+    Accent = Color3.fromRGB(140, 120, 255), TextMain = Color3.fromRGB(245, 245, 250),
+    TextSub = Color3.fromRGB(160, 160, 175), Border = Color3.fromRGB(45, 45, 60), OffColor = Color3.fromRGB(25, 25, 32)
 }
 
 local function sendBindNotification(funcName, state)
@@ -442,13 +442,13 @@ local function sendBindNotification(funcName, state)
     text.Font = Enum.Font.GothamBold
     text.TextSize = 13
     
-    local twIn = TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 0), Size = UDim2.new(1, 0, 0, 32)})
+    local twIn = TweenService:Create(notif, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 0), Size = UDim2.new(1, 0, 0, 32)})
     table.insert(activeTweens, twIn)
     twIn:Play()
     
     task.delay(1.5, function()
         if not isScriptActive then return end
-        local twOut = TweenService:Create(notif, TweenInfo.new(0.3, Enum.EasingStyle.Exponential, Enum.EasingDirection.In), {Position = UDim2.new(0, 250, 0, 0), Size = UDim2.new(0.8, 0, 0, 32)})
+        local twOut = TweenService:Create(notif, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Position = UDim2.new(0, 250, 0, 0), Size = UDim2.new(0.8, 0, 0, 32)})
         table.insert(activeTweens, twOut)
         twOut:Play()
         twOut.Completed:Connect(function() pcall(function() notif:Destroy() end) end)
@@ -641,7 +641,7 @@ Frame.BackgroundTransparency = Theme.BackgroundTrans
 Frame.BorderSizePixel = 0
 Frame.ClipsDescendants = true
 Frame.Visible = false
-Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 12)
+Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 10)
 local MainStroke = Instance.new("UIStroke", Frame)
 MainStroke.Thickness = 1.5
 MainStroke.Color = Theme.Border
@@ -687,7 +687,7 @@ Frame.Position = UDim2.new(0, 110, 0, 210)
 Frame.Visible = true
 DevToolsBtn.Visible = true
 
-local menuTw = TweenService:Create(Frame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 490, 0, 530), Position = UDim2.new(0, 90, 0, 190)})
+local menuTw = TweenService:Create(Frame, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 490, 0, 530), Position = UDim2.new(0, 90, 0, 190)})
 table.insert(activeTweens, menuTw)
 menuTw:Play()
 
@@ -697,26 +697,26 @@ local function ToggleMenu(forceState)
         Frame.Visible = true
         DevToolsBtn.Visible = true
         
-        local twHub = TweenService:Create(HubBtn, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 1, TextTransparency = 1})
-        TweenService:Create(HubStroke, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 1}):Play()
+        local twHub = TweenService:Create(HubBtn, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 1, TextTransparency = 1})
+        TweenService:Create(HubStroke, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Transparency = 1}):Play()
         twHub:Play()
         twHub.Completed:Connect(function(state) if state == Enum.PlaybackState.Completed and guiVisible then HubBtn.Visible = false end end)
 
-        TweenService:Create(DevToolsBtn, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0, TextTransparency = 0}):Play()
-        TweenService:Create(DTStroke, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 0}):Play()
+        TweenService:Create(DevToolsBtn, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 0, TextTransparency = 0}):Play()
+        TweenService:Create(DTStroke, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Transparency = 0}):Play()
 
-        local tw = TweenService:Create(Frame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 600)})
+        local tw = TweenService:Create(Frame, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 600)})
         table.insert(activeTweens, tw)
         tw:Play()
     else
         HubBtn.Visible = true
-        TweenService:Create(HubBtn, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {BackgroundTransparency = 0.15, TextTransparency = 0}):Play()
-        TweenService:Create(HubStroke, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Transparency = 0}):Play()
+        TweenService:Create(HubBtn, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 0.15, TextTransparency = 0}):Play()
+        TweenService:Create(HubStroke, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Transparency = 0}):Play()
 
-        TweenService:Create(DevToolsBtn, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {BackgroundTransparency = 1, TextTransparency = 1}):Play()
-        TweenService:Create(DTStroke, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Transparency = 1}):Play()
+        TweenService:Create(DevToolsBtn, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {BackgroundTransparency = 1, TextTransparency = 1}):Play()
+        TweenService:Create(DTStroke, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Transparency = 1}):Play()
         
-        local tw = TweenService:Create(Frame, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Size = UDim2.new(0, 520, 0, 0)})
+        local tw = TweenService:Create(Frame, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Size = UDim2.new(0, 520, 0, 0)})
         table.insert(activeTweens, tw)
         tw:Play()
         tw.Completed:Connect(function(state) 
@@ -851,7 +851,7 @@ Instance.new("UIStroke", BtnTeamVeh).Color = Theme.Border
 
 uiUpdaters.showTeamVehicles = function(state)
     settings.showTeamVehicles = state
-    TweenService:Create(BtnTeamVeh, TweenInfo.new(0.15, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+    TweenService:Create(BtnTeamVeh, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
         BackgroundColor3 = state and Theme.Accent or Theme.OffColor,
         TextColor3 = state and Color3.fromRGB(0,0,0) or Theme.TextMain
     }):Play()
@@ -912,7 +912,7 @@ local isXYZActive = false
 BtnXYZ.MouseButton1Click:Connect(function()
     isXYZActive = not isXYZActive
     XYZFrame.Visible = isXYZActive
-    TweenService:Create(BtnXYZ, TweenInfo.new(0.15, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+    TweenService:Create(BtnXYZ, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
         BackgroundColor3 = isXYZActive and Theme.Accent or Theme.OffColor,
         TextColor3 = isXYZActive and Color3.fromRGB(0,0,0) or Theme.TextMain
     }):Play()
@@ -921,7 +921,7 @@ end)
 local pathConnection
 BtnPath.MouseButton1Click:Connect(function()
     if pathConnection then return end
-    TweenService:Create(BtnPath, TweenInfo.new(0.15, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+    TweenService:Create(BtnPath, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
         BackgroundColor3 = Theme.Accent,
         TextColor3 = Color3.fromRGB(0,0,0)
     }):Play()
@@ -949,7 +949,7 @@ BtnPath.MouseButton1Click:Connect(function()
                 pathConnection:Disconnect()
                 pathConnection = nil
             end
-            TweenService:Create(BtnPath, TweenInfo.new(0.15, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+            TweenService:Create(BtnPath, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
                 BackgroundColor3 = Theme.OffColor,
                 TextColor3 = Theme.TextMain
             }):Play()
@@ -1116,23 +1116,23 @@ local function createTabButton(name, pageObject, isDefault)
         end
         local dir = (newIdx > oldIdx) and 1 or -1
         for _, tab in pairs(tabs) do 
-            TweenService:Create(tab.btn, TweenInfo.new(0.15, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextColor3 = Theme.TextSub}):Play()
+            TweenService:Create(tab.btn, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {TextColor3 = Theme.TextSub}):Play()
         end
-        TweenService:Create(Btn, TweenInfo.new(0.15, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {TextColor3 = Theme.Accent}):Play()
+        TweenService:Create(Btn, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {TextColor3 = Theme.Accent}):Play()
         
-        TweenService:Create(ActiveIndicator, TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {
+        TweenService:Create(ActiveIndicator, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
             Position = UDim2.new(0, idx * (65 + 12), 0, 0)
         }):Play()
         
         local oldPage = activePage
         activePage = pageObject
         if oldPage then
-            TweenService:Create(oldPage, TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Position = UDim2.new(-dir, 0, 0, 85)}):Play()
+            TweenService:Create(oldPage, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = UDim2.new(-dir, 0, 0, 85)}):Play()
             task.delay(0.25, function() if activePage ~= oldPage then oldPage.Visible = false end end)
         end
         pageObject.Position = UDim2.new(dir, 0, 0, 85)
         pageObject.Visible = true
-        TweenService:Create(pageObject, TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 85)}):Play()
+        TweenService:Create(pageObject, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 85)}):Play()
     end)
     table.insert(tabs, {btn = Btn, page = pageObject})
     if isDefault then 
@@ -1238,8 +1238,8 @@ local function createToggle(name, parent, settingKey, callback)
 
     local function updateVisual(state)
         settings[settingKey] = state
-        TweenService:Create(BtnBG, TweenInfo.new(0.2, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundColor3 = state and Theme.Accent or Theme.OffColor}):Play()
-        TweenService:Create(Indicator, TweenInfo.new(0.2, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Position = state and UDim2.new(1, -18, 0.5, -7) or UDim2.new(0, 4, 0.5, -7), BackgroundColor3 = state and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(220, 220, 230)}):Play()
+        TweenService:Create(BtnBG, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = state and Theme.Accent or Theme.OffColor}):Play()
+        TweenService:Create(Indicator, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = state and UDim2.new(1, -18, 0.5, -7) or UDim2.new(0, 4, 0.5, -7), BackgroundColor3 = state and Color3.fromRGB(0, 0, 0) or Color3.fromRGB(220, 220, 230)}):Play()
         if callback then callback(state) end
     end
     uiUpdaters[settingKey] = updateVisual
@@ -1300,7 +1300,7 @@ local function createSlider(name, parent, min, max, default, step, settingKey, c
         val = math.clamp(val, min, max)
         settings[settingKey] = val
         local snappedPos = (val - min) / (max - min)
-        TweenService:Create(SliderFill, TweenInfo.new(0.1, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(snappedPos, 0, 1, 0)}):Play()
+        TweenService:Create(SliderFill, TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(snappedPos, 0, 1, 0)}):Play()
         ValueText.Text = tostring(val)
         if callback then callback(val) end
     end
@@ -1348,8 +1348,8 @@ local function createActionButton(name, parent, callback)
     Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     
     BtnBG.MouseButton1Click:Connect(function()
-        TweenService:Create(BtnBG, TweenInfo.new(0.08, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.fromRGB(0,0,0)}):Play()
-        task.delay(0.08, function() TweenService:Create(BtnBG, TweenInfo.new(0.15, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.OffColor, TextColor3 = Theme.TextMain}):Play() end)
+        TweenService:Create(BtnBG, TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.fromRGB(0,0,0)}):Play()
+        task.delay(0.1, function() TweenService:Create(BtnBG, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.OffColor, TextColor3 = Theme.TextMain}):Play() end)
         callback()
     end)
 end
@@ -1373,8 +1373,8 @@ local function createDualActionButtons(name1, name2, parent, cb1, cb2)
         Stroke.Color = Theme.Border
         Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
         Btn.MouseButton1Click:Connect(function()
-            TweenService:Create(Btn, TweenInfo.new(0.08, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.fromRGB(0,0,0)}):Play()
-            task.delay(0.08, function() TweenService:Create(Btn, TweenInfo.new(0.15, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.OffColor, TextColor3 = Theme.TextMain}):Play() end)
+            TweenService:Create(Btn, TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.fromRGB(0,0,0)}):Play()
+            task.delay(0.1, function() TweenService:Create(Btn, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.OffColor, TextColor3 = Theme.TextMain}):Play() end)
             cb()
         end)
     end
@@ -1409,7 +1409,7 @@ local function createSubButton(name, parent, settingKey, callback)
     
     local function updateVisual(state)
         settings[settingKey] = state
-        TweenService:Create(Btn, TweenInfo.new(0.15, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundColor3 = state and Theme.Accent or Theme.OffColor, TextColor3 = state and Color3.fromRGB(0, 0, 0) or Theme.TextSub}):Play()
+        TweenService:Create(Btn, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = state and Theme.Accent or Theme.OffColor, TextColor3 = state and Color3.fromRGB(0, 0, 0) or Theme.TextSub}):Play()
         if callback then callback(state) end
     end
     uiUpdaters[settingKey] = updateVisual
@@ -1700,7 +1700,7 @@ Instance.new("UICorner", OilIdcBtn).CornerRadius = UDim.new(0, 4)
 Instance.new("UIStroke", OilIdcBtn).Color = Theme.Border
 
 OilIdcBtn.MouseButton1Click:Connect(function()
-    local tw = TweenService:Create(OilWindow, TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)})
+    local tw = TweenService:Create(OilWindow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)})
     table.insert(activeTweens, tw)
     tw:Play()
     tw.Completed:Wait()
@@ -1722,7 +1722,7 @@ Instance.new("UIStroke", InfoBtn).Color = Theme.Border
 InfoBtn.MouseButton1Click:Connect(function()
     OilModal.Visible = true
     OilWindow.Size = UDim2.new(0, 0, 0, 0)
-    local tw = TweenService:Create(OilWindow, TweenInfo.new(0.25, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {Size = UDim2.new(0, 260, 0, 140)})
+    local tw = TweenService:Create(OilWindow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 260, 0, 140)})
     table.insert(activeTweens, tw)
     tw:Play()
 end)
@@ -2180,8 +2180,8 @@ StrokeRejoin.Color = Theme.Border
 StrokeRejoin.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 BtnRejoin.MouseButton1Click:Connect(function()
-    TweenService:Create(BtnRejoin, TweenInfo.new(0.08, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.fromRGB(0,0,0)}):Play()
-    task.delay(0.08, function() TweenService:Create(BtnRejoin, TweenInfo.new(0.15, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.OffColor, TextColor3 = Theme.TextMain}):Play() end)
+    TweenService:Create(BtnRejoin, TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.fromRGB(0,0,0)}):Play()
+    task.delay(0.1, function() TweenService:Create(BtnRejoin, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.OffColor, TextColor3 = Theme.TextMain}):Play() end)
     if #Players:GetPlayers() <= 1 then TeleportService:Teleport(game.PlaceId, LocalPlayer) else TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer) end
 end)
 
@@ -2200,8 +2200,8 @@ StrokeHop.Color = Theme.Border
 StrokeHop.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 BtnHop.MouseButton1Click:Connect(function()
-    TweenService:Create(BtnHop, TweenInfo.new(0.08, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.fromRGB(0,0,0)}):Play()
-    task.delay(0.08, function() TweenService:Create(BtnHop, TweenInfo.new(0.15, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.OffColor, TextColor3 = Theme.TextMain}):Play() end)
+    TweenService:Create(BtnHop, TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.fromRGB(0,0,0)}):Play()
+    task.delay(0.1, function() TweenService:Create(BtnHop, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.OffColor, TextColor3 = Theme.TextMain}):Play() end)
     pcall(function()
         local response = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")
         if response then
@@ -2509,7 +2509,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
             if player == LocalPlayer then continue end
             if not espObjects[player] then
                 espObjects[player] = {
-                    box = createDrawing("Square", {Thickness = 1, Visible = false}),
+                    box = createDrawing("Square", {Thickness = 1.5, Visible = false}),
                     health = createDrawing("Text", {Center = true, Size = 13, Font = 2, Color = Color3.fromRGB(100, 255, 100), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
                     team = createDrawing("Text", {Center = true, Size = 13, Font = 2, Color = Color3.new(1,1,1), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
                     name = createDrawing("Text", {Center = true, Size = 13, Font = 2, Color = Color3.new(1,1,1), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
@@ -2520,7 +2520,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                 espObjects[player].chams.FillTransparency = 0.5
                 espObjects[player].chams.OutlineTransparency = 0
                 pcall(function() espObjects[player].chams.Parent = game:GetService("CoreGui") end)
-                tracerObjects[player] = createDrawing("Line", {Thickness = 1, Visible = false})
+                tracerObjects[player] = createDrawing("Line", {Thickness = 1.5, Visible = false})
             end
 
             local esp = espObjects[player]
@@ -2662,7 +2662,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                         pcall(function() vCham.Parent = game:GetService("CoreGui") end)
 
                         vehicleDrawings[i] = { 
-                            box = createDrawing("Square", {Thickness = 1, Color = Color3.fromRGB(150, 150, 255), Filled = false, Visible = false}), 
+                            box = createDrawing("Square", {Thickness = 1.5, Color = Color3.fromRGB(150, 150, 255), Filled = false, Visible = false}), 
                             text = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(150, 150, 255), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
                             healthText = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(100, 255, 100), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
                             occText = createDrawing("Text", {Center = true, Size = 13, Font = 2, Color = Color3.fromRGB(200, 200, 200), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
@@ -2824,7 +2824,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                     pcall(function() sCham.Parent = game:GetService("CoreGui") end)
 
                     subDrawings[i] = { 
-                        box = createDrawing("Square", {Thickness = 1, Color = Color3.fromRGB(0, 255, 255), Filled = false, Visible = false}), 
+                        box = createDrawing("Square", {Thickness = 1.5, Color = Color3.fromRGB(0, 255, 255), Filled = false, Visible = false}), 
                         text = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(0, 255, 255), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
                         healthText = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(100, 255, 100), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
                         chams = sCham
@@ -2922,7 +2922,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                     pcall(function() uCham.Parent = game:GetService("CoreGui") end)
 
                     uavDrawings[i] = { 
-                        box = createDrawing("Square", {Thickness = 1, Color = Color3.fromRGB(255, 140, 0), Filled = false, Visible = false}), 
+                        box = createDrawing("Square", {Thickness = 1.5, Color = Color3.fromRGB(255, 140, 0), Filled = false, Visible = false}), 
                         text = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(255, 140, 0), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
                         healthText = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(100, 255, 100), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
                         chams = uCham
@@ -3020,7 +3020,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                     pcall(function() gCham.Parent = game:GetService("CoreGui") end)
 
                     ugvDrawings[i] = { 
-                        box = createDrawing("Square", {Thickness = 1, Color = Color3.fromRGB(120, 255, 120), Filled = false, Visible = false}), 
+                        box = createDrawing("Square", {Thickness = 1.5, Color = Color3.fromRGB(120, 255, 120), Filled = false, Visible = false}), 
                         text = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(120, 255, 120), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
                         healthText = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(100, 255, 100), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
                         chams = gCham
@@ -3117,7 +3117,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                     pcall(function() dCham.Parent = game:GetService("CoreGui") end)
 
                     droneDrawings[i] = { 
-                        box = createDrawing("Square", {Thickness = 1, Color = Color3.fromRGB(200, 150, 255), Filled = false, Visible = false}), 
+                        box = createDrawing("Square", {Thickness = 1.5, Color = Color3.fromRGB(200, 150, 255), Filled = false, Visible = false}), 
                         text = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(200, 150, 255), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
                         healthText = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(100, 255, 100), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
                         chams = dCham
