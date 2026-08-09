@@ -19,7 +19,7 @@ local settings = {
     tracers = false, chams = false, clickTp = false,
     vehicleEsp = false, submarineEsp = true, uavEsp = true, 
     ugvEsp = true, droneEsp = true, showTeamVehicles = false,
-    teamCheck = true, noclip = false, fly = false, flySpeed = 250, noFallDmg = false,
+    teamCheck = true, noclip = false, fly = false, flySpeed = 250,
     infiniteJump = false, customWalkspeed = false, walkspeedValue = 100, freeCam = false, freeCamSpeed = 100,
     autoAirdrop = false, autoCrates = false, autoOil = false, autoBuild = false,
     noExplosions = false, antiAfk = false,
@@ -356,7 +356,7 @@ task.spawn(function()
                 end
                 
                 local foundSpecific = false
-                local workspaces = {"Tank Workspace", "Plane Workspace", "Submarine Workspace", "Helicopter Workspace", "Boat Workspace", "Vehicles Workspace", "Hovercraft Workspace"}
+                local workspaces = {"Tank Workspace", "Plane Workspace", "Submarine Workspace", "Helicopter Workspace", "Boat Workspace", "Vehicles Workspace"}
                 
                 for _, name in ipairs(workspaces) do
                     local folder = gs:FindFirstChild(name) or gs:FindFirstChild(string.lower(name))
@@ -382,38 +382,30 @@ end)
 local targetParent
 pcall(function() targetParent = gethui and gethui() end)
 if not targetParent then pcall(function() targetParent = game:GetService("CoreGui") end) end
-if not targetParent then 
-    targetParent = LocalPlayer:FindFirstChild("PlayerGui")
-    if not targetParent then
-        targetParent = LocalPlayer:WaitForChild("PlayerGui", 5) or game:GetService("StarterGui")
-    end
-end
+if not targetParent then targetParent = LocalPlayer:WaitForChild("PlayerGui") end
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "CustomOverlayMenu"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.IgnoreGuiInset = true
 pcall(function() if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end end)
-local successParent1 = pcall(function() ScreenGui.Parent = targetParent end)
-if not successParent1 then pcall(function() ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui", 5) or game:GetService("StarterGui") end) end
+ScreenGui.Parent = targetParent
 
 local StatsGui = Instance.new("ScreenGui")
 StatsGui.Name = "CustomStatsOverlay"
 StatsGui.ResetOnSpawn = false
 pcall(function() if syn and syn.protect_gui then syn.protect_gui(StatsGui) end end)
-local successParent2 = pcall(function() StatsGui.Parent = targetParent end)
-if not successParent2 then pcall(function() StatsGui.Parent = LocalPlayer:WaitForChild("PlayerGui", 5) or game:GetService("StarterGui") end) end
+StatsGui.Parent = targetParent
 
 local NotifGui = Instance.new("ScreenGui")
 NotifGui.Name = "CustomNotifOverlay"
 NotifGui.ResetOnSpawn = false
 pcall(function() if syn and syn.protect_gui then syn.protect_gui(NotifGui) end end)
-local successParent3 = pcall(function() NotifGui.Parent = targetParent end)
-if not successParent3 then pcall(function() NotifGui.Parent = LocalPlayer:WaitForChild("PlayerGui", 5) or game:GetService("StarterGui") end) end
+NotifGui.Parent = targetParent
 
 local NotifContainer = Instance.new("Frame", NotifGui)
 NotifContainer.Size = UDim2.new(0, 200, 1, 0)
-NotifContainer.Position = UDim2.new(1, -210, 0, -770)
+NotifContainer.Position = UDim2.new(1, -220, 0, 0)
 NotifContainer.BackgroundTransparency = 1
 
 local NotifLayout = Instance.new("UIListLayout", NotifContainer)
@@ -578,7 +570,7 @@ end))
 local VehHealthLabel = Instance.new("TextLabel", StatsGui)
 VehHealthLabel.Size = UDim2.new(0, 200, 0, 30)
 VehHealthLabel.AnchorPoint = Vector2.new(1, 1)
-VehHealthLabel.Position = UDim2.new(1, -30, 1, -240)
+VehHealthLabel.Position = UDim2.new(1, -30, 1, -60)
 VehHealthLabel.BackgroundTransparency = 1
 VehHealthLabel.Text = ""
 VehHealthLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
@@ -643,7 +635,7 @@ local guiVisible = false
 
 local Frame = Instance.new("Frame", ScreenGui)
 Frame.Size = UDim2.new(0, 520, 0, 560)
-Frame.Position = UDim2.new(0, 295, 0, 295)
+Frame.Position = UDim2.new(0, 90, 0, 190)
 Frame.BackgroundColor3 = Theme.Background
 Frame.BackgroundTransparency = Theme.BackgroundTrans
 Frame.BorderSizePixel = 0
@@ -654,15 +646,6 @@ local MainStroke = Instance.new("UIStroke", Frame)
 MainStroke.Thickness = 1.5
 MainStroke.Color = Theme.Border
 MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
-local DragBar = Instance.new("Frame", ScreenGui)
-DragBar.Size = UDim2.new(0, 100, 0, 6)
-DragBar.AnchorPoint = Vector2.new(0.5, 0)
-DragBar.BackgroundColor3 = Theme.Border
-DragBar.BackgroundTransparency = 1
-DragBar.BorderSizePixel = 0
-DragBar.Visible = false
-Instance.new("UICorner", DragBar).CornerRadius = UDim.new(1, 0)
 
 local HubBtn = Instance.new("TextButton", ScreenGui)
 HubBtn.Size = UDim2.new(0, 130, 0, 26)
@@ -699,23 +682,20 @@ DTStroke.Thickness = 1
 isLoaded = true
 guiVisible = true
 
-Frame.Size = UDim2.new(0, 520, 0, 0)
-Frame.Position = UDim2.new(0, 295, 0, 295)
+Frame.Size = UDim2.new(0, 480, 0, 0)
+Frame.Position = UDim2.new(0, 110, 0, 210)
 Frame.Visible = true
 DevToolsBtn.Visible = true
-DragBar.Visible = true
 
-local menuTw = TweenService:Create(Frame, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 600)})
+local menuTw = TweenService:Create(Frame, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 490, 0, 530), Position = UDim2.new(0, 90, 0, 190)})
 table.insert(activeTweens, menuTw)
 menuTw:Play()
-TweenService:Create(DragBar, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
 
 local function ToggleMenu(forceState)
     if forceState ~= nil then guiVisible = forceState else guiVisible = not guiVisible end
     if guiVisible then
         Frame.Visible = true
         DevToolsBtn.Visible = true
-        DragBar.Visible = true
         
         local twHub = TweenService:Create(HubBtn, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 1, TextTransparency = 1})
         TweenService:Create(HubStroke, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Transparency = 1}):Play()
@@ -725,7 +705,6 @@ local function ToggleMenu(forceState)
         TweenService:Create(DevToolsBtn, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 0, TextTransparency = 0}):Play()
         TweenService:Create(DTStroke, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Transparency = 0}):Play()
 
-        TweenService:Create(DragBar, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
         local tw = TweenService:Create(Frame, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 600)})
         table.insert(activeTweens, tw)
         tw:Play()
@@ -737,7 +716,6 @@ local function ToggleMenu(forceState)
         TweenService:Create(DevToolsBtn, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {BackgroundTransparency = 1, TextTransparency = 1}):Play()
         TweenService:Create(DTStroke, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Transparency = 1}):Play()
         
-        TweenService:Create(DragBar, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {BackgroundTransparency = 1}):Play()
         local tw = TweenService:Create(Frame, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Size = UDim2.new(0, 520, 0, 0)})
         table.insert(activeTweens, tw)
         tw:Play()
@@ -745,7 +723,6 @@ local function ToggleMenu(forceState)
             if state == Enum.PlaybackState.Completed and not guiVisible then 
                 Frame.Visible = false 
                 DevToolsBtn.Visible = false
-                DragBar.Visible = false
             end 
         end)
     end
@@ -754,37 +731,6 @@ end
 HubBtn.MouseButton1Click:Connect(function()
     ToggleMenu(true)
 end)
-
-local draggingMenu, dragStartMenu, startPosMenu
-table.insert(scriptConnections, DragBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingMenu = true
-        dragStartMenu = input.Position
-        startPosMenu = Frame.Position
-    end
-end))
-table.insert(scriptConnections, UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingMenu = false
-    end
-end))
-table.insert(scriptConnections, UserInputService.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        if draggingMenu then
-            local delta = input.Position - dragStartMenu
-            Frame.Position = UDim2.new(startPosMenu.X.Scale, startPosMenu.X.Offset + delta.X, startPosMenu.Y.Scale, startPosMenu.Y.Offset + delta.Y)
-        end
-    end
-end))
-
-table.insert(scriptConnections, Frame:GetPropertyChangedSignal("Size"):Connect(function()
-    DragBar.Position = UDim2.new(0, Frame.Position.X.Offset + 260, 0, Frame.Position.Y.Offset + Frame.Size.Y.Offset + 15)
-end))
-
-table.insert(scriptConnections, Frame:GetPropertyChangedSignal("Position"):Connect(function()
-    DragBar.Position = UDim2.new(0, Frame.Position.X.Offset + 260, 0, Frame.Position.Y.Offset + Frame.Size.Y.Offset + 15)
-    DevToolsBtn.Position = UDim2.new(0, Frame.Position.X.Offset + 20, 0, Frame.Position.Y.Offset - 35)
-end))
 
 local DevPassModal = Instance.new("Frame", ScreenGui)
 DevPassModal.Size = UDim2.new(1, 0, 1, 0)
@@ -846,28 +792,6 @@ DevPanel.ZIndex = 70
 DevPanel.Visible = false
 Instance.new("UICorner", DevPanel).CornerRadius = UDim.new(0, 8)
 Instance.new("UIStroke", DevPanel).Color = Theme.Border
-
-local devDragging, devDragStart, devStartPos
-table.insert(scriptConnections, DevPanel.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        devDragging = true
-        devDragStart = input.Position
-        devStartPos = DevPanel.Position
-    end
-end))
-table.insert(scriptConnections, UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        devDragging = false
-    end
-end))
-table.insert(scriptConnections, UserInputService.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        if devDragging then
-            local delta = input.Position - devDragStart
-            DevPanel.Position = UDim2.new(devStartPos.X.Scale, devStartPos.X.Offset + delta.X, devStartPos.Y.Scale, devStartPos.Y.Offset + delta.Y)
-        end
-    end
-end))
 
 local DPanelTitle = Instance.new("TextLabel", DevPanel)
 DPanelTitle.Size = UDim2.new(1, 0, 0, 30)
@@ -959,25 +883,28 @@ XYZLabel.Font = Enum.Font.GothamBold
 XYZLabel.TextSize = 13
 XYZLabel.Text = "Loading..."
 
-local xyzDragging, xyzDragStart, xyzStartPos
+local xyzDragging, xyzDragInput, xyzDragStart, xyzStartPos
 table.insert(scriptConnections, XYZFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
         xyzDragging = true
         xyzDragStart = input.Position
         xyzStartPos = XYZFrame.Position
+        table.insert(scriptConnections, input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                xyzDragging = false
+            end
+        end))
     end
 end))
-table.insert(scriptConnections, UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        xyzDragging = false
+table.insert(scriptConnections, XYZFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        xyzDragInput = input
     end
 end))
 table.insert(scriptConnections, UserInputService.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-        if xyzDragging then
-            local delta = input.Position - xyzDragStart
-            XYZFrame.Position = UDim2.new(xyzStartPos.X.Scale, xyzStartPos.X.Offset + delta.X, xyzStartPos.Y.Scale, xyzStartPos.Y.Offset + delta.Y)
-        end
+    if input == xyzDragInput and xyzDragging then
+        local delta = input.Position - xyzDragStart
+        XYZFrame.Position = UDim2.new(xyzStartPos.X.Scale, xyzStartPos.X.Offset + delta.X, xyzStartPos.Y.Scale, xyzStartPos.Y.Offset + delta.Y)
     end
 end))
 
@@ -1224,6 +1151,44 @@ BottomPanel.BackgroundTransparency = 1
 local BottomLayout = Instance.new("UIListLayout", BottomPanel)
 BottomLayout.SortOrder = Enum.SortOrder.LayoutOrder
 BottomLayout.Padding = UDim.new(0, 10)
+
+local dragging, dragInput, dragStart, startPos
+table.insert(scriptConnections, Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true; dragStart = input.Position; startPos = Frame.Position
+        table.insert(scriptConnections, input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end))
+    end
+end))
+table.insert(scriptConnections, Frame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+end))
+table.insert(scriptConnections, UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        local newPos = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        Frame.Position = newPos
+        DevToolsBtn.Position = UDim2.new(0, newPos.X.Offset + 20, 0, newPos.Y.Offset - 35)
+    end
+end))
+
+local devDragging, devDragInput, devDragStart, devStartPos
+table.insert(scriptConnections, DevPanel.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        devDragging = true
+        devDragStart = input.Position
+        devStartPos = DevPanel.Position
+        table.insert(scriptConnections, input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then devDragging = false end end))
+    end
+end))
+table.insert(scriptConnections, DevPanel.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then devDragInput = input end
+end))
+table.insert(scriptConnections, UserInputService.InputChanged:Connect(function(input)
+    if input == devDragInput and devDragging then
+        local delta = input.Position - devDragStart
+        DevPanel.Position = UDim2.new(devStartPos.X.Scale, devStartPos.X.Offset + delta.X, devStartPos.Y.Scale, devStartPos.Y.Offset + delta.Y)
+    end
+end))
 
 local function createGroup(parent)
     local Group = Instance.new("Frame", parent)
@@ -1534,22 +1499,17 @@ createSlider("Predict Strength", AimbotGroup, 1, 100, settings.predictStrength, 
 createToggle("Shoot While Sprinting", AimbotGroup, "shootWhileSprinting")
 
 local MovementGroup = createGroup(Pages.PlayerLeft)
-createToggle("No Fall Damage", MovementGroup, "noFallDmg")
 createToggle("Noclip", MovementGroup, "noclip")
+createToggle("Fly", MovementGroup, "fly")
+createSlider("Fly Speed", MovementGroup, 5, 500, settings.flySpeed, 5, "flySpeed")
 createToggle("Infinite Jump", MovementGroup, "infiniteJump")
-
-local MovementRightGroup = createGroup(Pages.PlayerRight)
-createToggle("Fly", MovementRightGroup, "fly")
-createSlider("Fly Speed", MovementRightGroup, 5, 500, settings.flySpeed, 5, "flySpeed")
-
-local MovementRightGroupWalkspeed = createGroup(Pages.PlayerRight)
-createToggle("Custom Walkspeed", MovementRightGroupWalkspeed, "customWalkspeed", function(state)
+createToggle("Custom Walkspeed", MovementGroup, "customWalkspeed", function(state)
     if not state and LocalPlayer.Character then
         local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
         if hum then hum.WalkSpeed = 16 end
     end
 end)
-createSlider("Walkspeed Value", MovementRightGroupWalkspeed, 16, 500, settings.walkspeedValue, 1, "walkspeedValue")
+createSlider("Walkspeed Value", MovementGroup, 16, 500, settings.walkspeedValue, 1, "walkspeedValue")
 
 local MiscCombatGroup = createGroup(Pages.CombatRight)
 createToggle("Hitbox Expander", MiscCombatGroup, "hitboxExpander", function(state)
@@ -1574,7 +1534,7 @@ createDualActionButtons("TP to Base", "TP to Capture", MiscCombatGroup,
         end 
     end
 )
-createDualActionButtons("Custom TP", "Save custom TP", MiscCombatGroup,
+createDualActionButtons("Custom TP", "Change custom TP", MiscCombatGroup,
     function() if customSpawnCFrame and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then LocalPlayer.Character.HumanoidRootPart.CFrame = customSpawnCFrame end end,
     function() if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then customSpawnCFrame = LocalPlayer.Character.HumanoidRootPart.CFrame end end
 )
@@ -2417,15 +2377,6 @@ table.insert(scriptConnections, RunService.Stepped:Connect(function()
     if not LocalPlayer.Character then return end
     local char = LocalPlayer.Character; local hum = char:FindFirstChild("Humanoid"); local hrp = char:FindFirstChild("HumanoidRootPart")
     
-    if settings.noFallDmg and hrp and hrp.Velocity.Y < -35 then
-        local params = RaycastParams.new()
-        params.FilterType = Enum.RaycastFilterType.Exclude
-        params.FilterDescendantsInstances = {char}
-        if workspace:Raycast(hrp.Position, Vector3.new(0, -25, 0), params) then
-            hrp.Velocity = Vector3.new(hrp.Velocity.X, 15, hrp.Velocity.Z)
-        end
-    end
-
     if settings.noclip then
         wasNoclip = true
         for _, p in ipairs(char:GetDescendants()) do if p:IsA("BasePart") and p.CanCollide then p.CanCollide = false end end
@@ -2489,13 +2440,10 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
     elseif not settings.freeCam and freecamActive then
         freecamActive = false
         Camera.CameraType = Enum.CameraType.Custom
-        if LocalPlayer.Character then
-            local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
-            if hum then Camera.CameraSubject = hum end
-            local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then hrp.Anchored = false end
-        end
         UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.Anchored = false
+        end
     end
 
     if freecamActive then
@@ -2571,8 +2519,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                 espObjects[player].chams.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
                 espObjects[player].chams.FillTransparency = 0.5
                 espObjects[player].chams.OutlineTransparency = 0
-                local s = pcall(function() espObjects[player].chams.Parent = game:GetService("CoreGui") end)
-                if not s then pcall(function() espObjects[player].chams.Parent = targetParent end) end
+                pcall(function() espObjects[player].chams.Parent = game:GetService("CoreGui") end)
                 tracerObjects[player] = createDrawing("Line", {Thickness = 1.5, Visible = false})
             end
 
@@ -2712,8 +2659,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                         vCham.OutlineTransparency = 0
                         vCham.FillColor = Color3.fromRGB(150, 150, 255)
                         vCham.OutlineColor = Color3.new(1,1,1)
-                        local s = pcall(function() vCham.Parent = game:GetService("CoreGui") end)
-                        if not s then pcall(function() vCham.Parent = targetParent end) end
+                        pcall(function() vCham.Parent = game:GetService("CoreGui") end)
 
                         vehicleDrawings[i] = { 
                             box = createDrawing("Square", {Thickness = 1.5, Color = Color3.fromRGB(150, 150, 255), Filled = false, Visible = false}), 
@@ -2875,8 +2821,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                     sCham.OutlineTransparency = 0
                     sCham.FillColor = Color3.fromRGB(0, 255, 255)
                     sCham.OutlineColor = Color3.new(1,1,1)
-                    local s = pcall(function() sCham.Parent = game:GetService("CoreGui") end)
-                    if not s then pcall(function() sCham.Parent = targetParent end) end
+                    pcall(function() sCham.Parent = game:GetService("CoreGui") end)
 
                     subDrawings[i] = { 
                         box = createDrawing("Square", {Thickness = 1.5, Color = Color3.fromRGB(0, 255, 255), Filled = false, Visible = false}), 
@@ -2974,8 +2919,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                     uCham.OutlineTransparency = 0
                     uCham.FillColor = Color3.fromRGB(255, 140, 0)
                     uCham.OutlineColor = Color3.new(1,1,1)
-                    local s = pcall(function() uCham.Parent = game:GetService("CoreGui") end)
-                    if not s then pcall(function() uCham.Parent = targetParent end) end
+                    pcall(function() uCham.Parent = game:GetService("CoreGui") end)
 
                     uavDrawings[i] = { 
                         box = createDrawing("Square", {Thickness = 1.5, Color = Color3.fromRGB(255, 140, 0), Filled = false, Visible = false}), 
@@ -3073,8 +3017,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                     gCham.OutlineTransparency = 0
                     gCham.FillColor = Color3.fromRGB(120, 255, 120)
                     gCham.OutlineColor = Color3.new(1,1,1)
-                    local s = pcall(function() gCham.Parent = game:GetService("CoreGui") end)
-                    if not s then pcall(function() gCham.Parent = targetParent end) end
+                    pcall(function() gCham.Parent = game:GetService("CoreGui") end)
 
                     ugvDrawings[i] = { 
                         box = createDrawing("Square", {Thickness = 1.5, Color = Color3.fromRGB(120, 255, 120), Filled = false, Visible = false}), 
@@ -3171,8 +3114,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                     dCham.OutlineTransparency = 0
                     dCham.FillColor = Color3.fromRGB(200, 150, 255)
                     dCham.OutlineColor = Color3.new(1,1,1)
-                    local s = pcall(function() dCham.Parent = game:GetService("CoreGui") end)
-                    if not s then pcall(function() dCham.Parent = targetParent end) end
+                    pcall(function() dCham.Parent = game:GetService("CoreGui") end)
 
                     droneDrawings[i] = { 
                         box = createDrawing("Square", {Thickness = 1.5, Color = Color3.fromRGB(200, 150, 255), Filled = false, Visible = false}), 
@@ -3406,15 +3348,10 @@ task.spawn(function()
                     if prompt and part and oil then
                         hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
                         hrp.Velocity = Vector3.new(0,0,0)
-                        while isScriptActive and settings.autoCrates and (oil:GetAttribute("Disabled") == true or (oil:FindFirstChild("Disabled") and oil.Disabled.Value == true)) do
-                            hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
-                            hrp.Velocity = Vector3.new(0,0,0)
-                            task.wait(0.1)
-                        end
-                        task.wait(0.5)
-                        pcall(function() VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game) end)
+                        task.wait(0.2)
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
                         task.wait(3.2)
-                        pcall(function() VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game) end)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
                     end
                 else
                     local col = workspace:FindFirstChild("Game Systems") and workspace["Game Systems"]:FindFirstChild("Collectibles Workspace")
@@ -3451,10 +3388,10 @@ task.spawn(function()
                         if part then
                             hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
                             hrp.Velocity = Vector3.new(0,0,0)
-                            task.wait(0.5)
-                            pcall(function() VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game) end)
+                            task.wait(0.2)
+                            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
                             task.wait(3.2)
-                            pcall(function() VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game) end)
+                            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
                         end
                     end
                 end
@@ -3483,15 +3420,10 @@ task.spawn(function()
                     if prompt and part and oil then
                         hrp.CFrame = part.CFrame + Vector3.new(0, 6, 0)
                         hrp.Velocity = Vector3.new(0,0,0)
-                        while isScriptActive and settings.autoOil and (oil:GetAttribute("Disabled") == true or (oil:FindFirstChild("Disabled") and oil.Disabled.Value == true)) do
-                            hrp.CFrame = part.CFrame + Vector3.new(0, 6, 0)
-                            hrp.Velocity = Vector3.new(0,0,0)
-                            task.wait(0.1)
-                        end
-                        task.wait(0.5)
-                        pcall(function() VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game) end)
+                        task.wait(0.2)
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
                         task.wait(3.2)
-                        pcall(function() VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game) end)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
                     end
                 else
                     local col = workspace:FindFirstChild("Game Systems") and workspace["Game Systems"]:FindFirstChild("Collectibles Workspace")
@@ -3528,10 +3460,10 @@ task.spawn(function()
                         if part then
                             hrp.CFrame = part.CFrame + Vector3.new(0, 6, 0)
                             hrp.Velocity = Vector3.new(0,0,0)
-                            task.wait(0.5)
-                            pcall(function() VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game) end)
+                            task.wait(0.2)
+                            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
                             task.wait(3.2)
-                            pcall(function() VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game) end)
+                            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
                         end
                     end
                 end
@@ -3572,10 +3504,10 @@ task.spawn(function()
                     hrp.CFrame = targetCF + Vector3.new(0, targetSize.Y/2 + 2, 0)
                     hrp.Velocity = Vector3.new(0,0,0)
                     
-                    task.wait(0.5)
-                    pcall(function() VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game) end)
+                    task.wait(0.2)
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
                     task.wait(3.5)
-                    pcall(function() VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game) end)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
                     
                     hrp.CFrame = originalPos
                     hrp.Velocity = Vector3.new(0, 0, 0)
