@@ -20,7 +20,7 @@ local settings = {
     vehicleEsp = false, submarineEsp = true, uavEsp = true, 
     ugvEsp = true, droneEsp = true, showTeamVehicles = false,
     teamCheck = true, noclip = false, fly = false, flySpeed = 250, noFallDmg = false,
-    infiniteJump = false, customWalkspeed = false, walkspeedValue = 100, freeCam = false, freeCamSpeed = 150,
+    infiniteJump = false, customWalkspeed = false, walkspeedValue = 100, freeCam = false, freeCamSpeed = 100,
     autoAirdrop = false, autoCrates = false, autoOil = false, autoBuild = false,
     noExplosions = false, antiAfk = false,
     binds = { aimbot = nil, fly = nil, noclip = nil, clickTp = nil, customTp = nil, freeCam = nil }
@@ -656,12 +656,12 @@ MainStroke.Color = Theme.Border
 MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 local DragBar = Instance.new("Frame", ScreenGui)
-DragBar.Size = UDim2.new(0, 200, 0, 6)
+DragBar.Size = UDim2.new(0, 100, 0, 6)
 DragBar.AnchorPoint = Vector2.new(0.5, 0)
-DragBar.BackgroundColor3 = Color3.fromRGB(245, 245, 245)
+DragBar.BackgroundColor3 = Theme.Border
 DragBar.BackgroundTransparency = 1
 DragBar.BorderSizePixel = 0
-DragBar.Visible = true
+DragBar.Visible = false
 Instance.new("UICorner", DragBar).CornerRadius = UDim.new(1, 0)
 
 local HubBtn = Instance.new("TextButton", ScreenGui)
@@ -755,50 +755,34 @@ HubBtn.MouseButton1Click:Connect(function()
     ToggleMenu(true)
 end)
 
-local draggingMenu, dragStartMouse, dragStartDragBar, dragStartFrame
+local draggingMenu, dragStartMenu, startPosMenu
 table.insert(scriptConnections, DragBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         draggingMenu = true
-        dragStartMouse = input.Position
-        dragStartDragBar = DragBar.Position
-        dragStartFrame = Frame.Position
+        dragStartMenu = input.Position
+        startPosMenu = Frame.Position
     end
 end))
 table.insert(scriptConnections, UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        if draggingMenu then
-            draggingMenu = false
-            if DragBar.Visible then
-                TweenService:Create(DragBar, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = UDim2.new(0, Frame.Position.X.Offset + 260, 0, Frame.Position.Y.Offset + Frame.Size.Y.Offset + 15)}):Play()
-            end
-        end
+        draggingMenu = false
     end
 end))
 table.insert(scriptConnections, UserInputService.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
         if draggingMenu then
-            local delta = input.Position - dragStartMouse
-            
-            if DragBar.Visible then
-                DragBar.Position = UDim2.new(dragStartDragBar.X.Scale, dragStartDragBar.X.Offset + delta.X, dragStartDragBar.Y.Scale, dragStartDragBar.Y.Offset + delta.Y)
-            end
-            
-            local targetFramePos = UDim2.new(dragStartFrame.X.Scale, dragStartFrame.X.Offset + delta.X, dragStartFrame.Y.Scale, dragStartFrame.Y.Offset + delta.Y)
-            TweenService:Create(Frame, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = targetFramePos}):Play()
+            local delta = input.Position - dragStartMenu
+            Frame.Position = UDim2.new(startPosMenu.X.Scale, startPosMenu.X.Offset + delta.X, startPosMenu.Y.Scale, startPosMenu.Y.Offset + delta.Y)
         end
     end
 end))
 
 table.insert(scriptConnections, Frame:GetPropertyChangedSignal("Size"):Connect(function()
-    if not draggingMenu and DragBar.Visible then
-        DragBar.Position = UDim2.new(0, Frame.Position.X.Offset + 260, 0, Frame.Position.Y.Offset + Frame.Size.Y.Offset + 15)
-    end
+    DragBar.Position = UDim2.new(0, Frame.Position.X.Offset + 260, 0, Frame.Position.Y.Offset + Frame.Size.Y.Offset + 15)
 end))
 
 table.insert(scriptConnections, Frame:GetPropertyChangedSignal("Position"):Connect(function()
-    if not draggingMenu and DragBar.Visible then
-        DragBar.Position = UDim2.new(0, Frame.Position.X.Offset + 260, 0, Frame.Position.Y.Offset + Frame.Size.Y.Offset + 15)
-    end
+    DragBar.Position = UDim2.new(0, Frame.Position.X.Offset + 260, 0, Frame.Position.Y.Offset + Frame.Size.Y.Offset + 15)
     DevToolsBtn.Position = UDim2.new(0, Frame.Position.X.Offset + 20, 0, Frame.Position.Y.Offset - 35)
 end))
 
@@ -1550,7 +1534,7 @@ createSlider("Predict Strength", AimbotGroup, 1, 100, settings.predictStrength, 
 createToggle("Shoot While Sprinting", AimbotGroup, "shootWhileSprinting")
 
 local MovementGroup = createGroup(Pages.PlayerLeft)
-createToggle("Less Fall Damage", MovementGroup, "noFallDmg")
+createToggle("No Fall Damage", MovementGroup, "noFallDmg")
 createToggle("Noclip", MovementGroup, "noclip")
 createToggle("Infinite Jump", MovementGroup, "infiniteJump")
 
@@ -1649,6 +1633,17 @@ local vehicleToggle = createToggle("Vehicle ESP", EnvGroup, "vehicleEsp", functi
         table.clear(vehicles)
     end
 end)
+
+local waitLabel = Instance.new("TextLabel", vehicleToggle)
+waitLabel.Size = UDim2.new(0, 100, 1, 0)
+waitLabel.AnchorPoint = Vector2.new(1, 0.5)
+waitLabel.Position = UDim2.new(1, -62, 0.5, 0)
+waitLabel.BackgroundTransparency = 1
+waitLabel.Text = "wait ≈3 sec"
+waitLabel.TextColor3 = Theme.TextSub
+waitLabel.Font = Enum.Font.Gotham
+waitLabel.TextSize = 10
+waitLabel.TextXAlignment = Enum.TextXAlignment.Right
 
 createToggle("Submarine ESP", EnvGroup, "submarineEsp", function(v)
     if not v then
@@ -2422,19 +2417,15 @@ table.insert(scriptConnections, RunService.Stepped:Connect(function()
     if not LocalPlayer.Character then return end
     local char = LocalPlayer.Character; local hum = char:FindFirstChild("Humanoid"); local hrp = char:FindFirstChild("HumanoidRootPart")
     
-    if settings.noFallDmg and hrp and hum and hum:GetState() == Enum.HumanoidStateType.Freefall then
-        if hrp.Velocity.Y < -20 then
-            local raycastParams = RaycastParams.new()
-            raycastParams.FilterDescendantsInstances = {char}
-            raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-            
-            local result = workspace:Raycast(hrp.Position, Vector3.new(0, -25, 0), raycastParams)
-            
-            if result and result.Distance < 15 then
-                hrp.Velocity = Vector3.new(hrp.Velocity.X, 0, hrp.Velocity.Z)
-            end
+    if settings.noFallDmg and hrp and hrp.Velocity.Y < -35 then
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        params.FilterDescendantsInstances = {char}
+        if workspace:Raycast(hrp.Position, Vector3.new(0, -25, 0), params) then
+            hrp.Velocity = Vector3.new(hrp.Velocity.X, 15, hrp.Velocity.Z)
         end
     end
+
     if settings.noclip then
         wasNoclip = true
         for _, p in ipairs(char:GetDescendants()) do if p:IsA("BasePart") and p.CanCollide then p.CanCollide = false end end
