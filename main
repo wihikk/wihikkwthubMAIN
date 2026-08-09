@@ -5,6 +5,7 @@ local TweenService = game:GetService("TweenService")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local Teams = game:GetService("Teams")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
@@ -17,12 +18,12 @@ local settings = {
     esp = true, espBoxes = true, espHealth = true, espDist = true, espNames = true, espTeams = true, espTeamsWhite = true,
     tracers = false, chams = false, clickTp = false,
     vehicleEsp = false, submarineEsp = true, uavEsp = true, 
-    ugvEsp = true, showTeamVehicles = false,
+    ugvEsp = true, droneEsp = true, showTeamVehicles = false,
     teamCheck = true, noclip = false, fly = false, flySpeed = 250,
     infiniteJump = false, customWalkspeed = false, walkspeedValue = 100, freeCam = false, freeCamSpeed = 100,
     autoAirdrop = false, autoCrates = false, autoOil = false, autoBuild = false,
     noExplosions = false, antiAfk = false,
-    binds = { aimbot = nil, fly = nil, noclip = nil, clickTp = nil, customTp = nil }
+    binds = { aimbot = nil, fly = nil, noclip = nil, clickTp = nil, customTp = nil, freeCam = nil }
 }
 
 local uiUpdaters = {}
@@ -38,12 +39,13 @@ local isMiscPageOpen = false
 local devToolsUnlocked = false
 local activeTarget = nil
 
-local sysCache = { subs = {}, uavs = {}, ugvs = {} }
+local sysCache = { subs = {}, uavs = {}, ugvs = {}, drones = {} }
 local vehicles = {}
 local vehicleDrawings = {}
 local subDrawings = {}
 local uavDrawings = {}
 local ugvDrawings = {}
+local droneDrawings = {}
 
 local espObjects = {}
 local tracerObjects = {}
@@ -126,6 +128,8 @@ local function resetHitboxes()
                 local head = player.Character.Head
                 head.Size = Vector3.new(1.2, 1.2, 1.2)
                 head.Transparency = 0
+                local box = head:FindFirstChild("HitboxAdornment")
+                if box then box:Destroy() end
             end)
         end
     end
@@ -141,6 +145,21 @@ table.insert(scriptConnections, RunService.Heartbeat:Connect(function()
                         head.Size = Vector3.new(settings.hitboxSize, settings.hitboxSize, settings.hitboxSize)
                         head.Transparency = 0.7
                         head.CanCollide = false
+                        head.Massless = true
+                        
+                        local box = head:FindFirstChild("HitboxAdornment")
+                        if not box then
+                            box = Instance.new("BoxHandleAdornment")
+                            box.Name = "HitboxAdornment"
+                            box.Adornee = head
+                            box.AlwaysOnTop = true
+                            box.ZIndex = 10
+                            box.Parent = head
+                        end
+                        box.Size = head.Size
+                        box.Transparency = 0.7
+                        box.Color3 = player.Team and player.Team.TeamColor.Color or Color3.fromRGB(255, 255, 255)
+                        box.Visible = true
                     end)
                 end
             end
@@ -322,23 +341,40 @@ local FOVring = createDrawing("Circle", {
 task.spawn(function()
     while isScriptActive do
         if settings.vehicleEsp then
-            local newVehicles = {}
             local gs = workspace:FindFirstChild("Game Systems")
-            local objectsToScan = gs and gs:GetChildren() or {}
-            
-            local scanCount = 0
-            while #objectsToScan > 0 and isScriptActive do
-                local currentObj = table.remove(objectsToScan, #objectsToScan)
-                if currentObj:IsA("VehicleSeat") then table.insert(newVehicles, currentObj) end
-                for _, child in ipairs(currentObj:GetChildren()) do table.insert(objectsToScan, child) end
+            if gs then
+                local newVehicles = {}
+                local function scan(p)
+                    for _, obj in ipairs(p:GetDescendants()) do
+                        if obj:IsA("VehicleSeat") then
+                            local mdl = obj:FindFirstAncestorOfClass("Model")
+                            if not (mdl and string.lower(mdl.Name) == "ejectiongroup_pilotseat") then
+                                table.insert(newVehicles, obj)
+                            end
+                        end
+                    end
+                end
                 
-                scanCount = scanCount + 1
-                if scanCount % 200 == 0 then RunService.Heartbeat:Wait() end
+                local foundSpecific = false
+                local workspaces = {"Tank Workspace", "Plane Workspace", "Submarine Workspace", "Helicopter Workspace", "Boat Workspace", "Vehicles Workspace"}
+                
+                for _, name in ipairs(workspaces) do
+                    local folder = gs:FindFirstChild(name) or gs:FindFirstChild(string.lower(name))
+                    if folder then 
+                        foundSpecific = true
+                        scan(folder)
+                    end
+                end
+                
+                if not foundSpecific then 
+                    scan(gs)
+                end
+                
+                vehicles = newVehicles
             end
-            if isScriptActive then vehicles = newVehicles end
             task.wait(2)
         else
-            task.wait(1)
+            task.wait(2)
         end
     end
 end)
@@ -599,7 +635,7 @@ local guiVisible = false
 
 local Frame = Instance.new("Frame", ScreenGui)
 Frame.Size = UDim2.new(0, 520, 0, 560)
-Frame.Position = UDim2.new(0, 50, 0, 150)
+Frame.Position = UDim2.new(0, 90, 0, 190)
 Frame.BackgroundColor3 = Theme.Background
 Frame.BackgroundTransparency = Theme.BackgroundTrans
 Frame.BorderSizePixel = 0
@@ -647,11 +683,11 @@ isLoaded = true
 guiVisible = true
 
 Frame.Size = UDim2.new(0, 480, 0, 0)
-Frame.Position = UDim2.new(0, 70, 0, 170)
+Frame.Position = UDim2.new(0, 110, 0, 210)
 Frame.Visible = true
 DevToolsBtn.Visible = true
 
-local menuTw = TweenService:Create(Frame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 490, 0, 530), Position = UDim2.new(0, 50, 0, 150)})
+local menuTw = TweenService:Create(Frame, TweenInfo.new(0.4, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Size = UDim2.new(0, 490, 0, 530), Position = UDim2.new(0, 90, 0, 190)})
 table.insert(activeTweens, menuTw)
 menuTw:Play()
 
@@ -1602,6 +1638,17 @@ createToggle("UGV ESP", EnvGroup, "ugvEsp", function(v)
         table.clear(ugvDrawings)
     end
 end)
+createToggle("Drone ESP", EnvGroup, "droneEsp", function(v)
+    if not v then
+        for _, draw in pairs(droneDrawings) do 
+            safeRemoveDrawing(draw.box)
+            safeRemoveDrawing(draw.text)
+            if draw.healthText then safeRemoveDrawing(draw.healthText) end 
+            if draw.chams then pcall(function() draw.chams:Destroy() end) end
+        end
+        table.clear(droneDrawings)
+    end
+end)
 
 local AutoFarmGroup = createGroup(Pages.AutoLeft)
 createToggle("Auto Airdrop", AutoFarmGroup, "autoAirdrop")
@@ -1686,6 +1733,7 @@ createKeybind("Fly Bind", BindsGroup, "fly")
 createKeybind("Noclip Bind", BindsGroup, "noclip")
 createKeybind("Click TP Bind", BindsGroup, "clickTp")
 createKeybind("Custom TP Bind", BindsGroup, "customTp")
+createKeybind("Free Cam Bind", BindsGroup, "freeCam")
 
 local ClientGroup = createGroup(Pages.MiscLeft)
 createToggle("Anti AFK", ClientGroup, "antiAfk")
@@ -2231,6 +2279,7 @@ local function UnloadScript()
     cleanDrawings(tracerObjects)
     cleanDrawings(vehicleDrawings); cleanDrawings(subDrawings)
     cleanDrawings(uavDrawings); cleanDrawings(ugvDrawings)
+    cleanDrawings(droneDrawings)
     
     for _, c in ipairs(sprintConns) do pcall(function() c:Disconnect() end) end
     table.clear(sprintConns)
@@ -2241,6 +2290,7 @@ local function UnloadScript()
     table.clear(sysCache.subs)
     table.clear(sysCache.uavs)
     table.clear(sysCache.ugvs)
+    table.clear(sysCache.drones)
     table.clear(entityDataCache)
     
     pcall(function() VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game) end)
@@ -2296,7 +2346,7 @@ table.insert(scriptConnections, UserInputService.InputBegan:Connect(function(inp
                     local newState = not settings[key]
                     uiUpdaters[key](newState) 
                     
-                    local keyNames = {aimbot = "Aimbot", fly = "Fly", noclip = "Noclip", clickTp = "Click TP", customTp = "Custom TP"}
+                    local keyNames = {aimbot = "Aimbot", fly = "Fly", noclip = "Noclip", clickTp = "Click TP", customTp = "Custom TP", freeCam = "Free Cam"}
                     local funcName = keyNames[key] or key
                     sendBindNotification(funcName, newState)
                 end
@@ -2479,64 +2529,76 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
 
             local isHiddenByVehicle = false
             if settings.vehicleEsp and char and char:FindFirstChild("Humanoid") and char.Humanoid.SeatPart then
-                isHiddenByVehicle = true
+                local seatMdl = char.Humanoid.SeatPart:FindFirstAncestorOfClass("Model")
+                if not (seatMdl and string.lower(seatMdl.Name) == "ejectiongroup_pilotseat") then
+                    isHiddenByVehicle = true
+                end
             end
 
-            if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Head") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 and (not settings.teamCheck or player.Team ~= LocalPlayer.Team) and (player.Team == nil or string.lower(player.Team.Name) ~= "loading") and not isHiddenByVehicle then
+            if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Head") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 and (not settings.teamCheck or player.Team ~= LocalPlayer.Team) and (player.Team == nil or string.lower(player.Team.Name) ~= "loading") then
                 local tColor = player.Team and player.Team.TeamColor.Color or Color3.fromRGB(255, 60, 60)
                 local tName = player.Team and player.Team.Name or "No Team"
 
-                if settings.chams then
-                    esp.chams.Adornee = char
-                    esp.chams.FillColor = tColor
-                    esp.chams.OutlineColor = Color3.new(1,1,1)
-                    esp.chams.Enabled = true
-                else
-                    esp.chams.Enabled = false
-                end
+                local rPos = char.HumanoidRootPart.Position
+                local r2d, onR = Camera:WorldToViewportPoint(rPos)
 
-                if settings.esp or settings.tracers then
-                    local rPos = char.HumanoidRootPart.Position
-                    local b2d, onB = Camera:WorldToViewportPoint(rPos - Vector3.new(0, 3, 0))
-                    local t2d, onT = Camera:WorldToViewportPoint(char.Head.Position + Vector3.new(0, 0.5, 0))
-                    local r2d, onR = Camera:WorldToViewportPoint(rPos)
+                if settings.tracers and onR and r2d.Z > 0 then
+                    tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    tracer.To = Vector2.new(r2d.X, r2d.Y)
+                    tracer.Color = tColor
+                    tracer.Visible = true
+                else tracer.Visible = false end
 
-                    if settings.tracers and onR and r2d.Z > 0 then
-                        tracer.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                        tracer.To = Vector2.new(r2d.X, r2d.Y)
-                        tracer.Color = tColor
-                        tracer.Visible = true
-                    else tracer.Visible = false end
+                if not isHiddenByVehicle then
+                    if settings.chams then
+                        esp.chams.Adornee = char
+                        esp.chams.FillColor = tColor
+                        esp.chams.OutlineColor = Color3.new(1,1,1)
+                        esp.chams.Enabled = true
+                    else
+                        esp.chams.Enabled = false
+                    end
 
-                    if settings.esp and (onB or onT) and b2d.Z > 0 then
-                        local h = math.abs(b2d.Y - t2d.Y)
-                        local w = h / 1.5
-                        
-                        esp.box.Size = Vector2.new(w, h)
-                        esp.box.Position = Vector2.new(t2d.X - w/2, t2d.Y)
-                        esp.box.Color = tColor; esp.box.Visible = settings.espBoxes
-                        
-                        esp.health.Text = math.floor(char.Humanoid.Health).." HP"
-                        esp.health.Position = Vector2.new(t2d.X - w/2 - 25, t2d.Y + (h/2) - 6)
-                        esp.health.Visible = settings.espHealth
-                        
-                        esp.team.Text = tName
-                        esp.team.Color = settings.espTeamsWhite and Color3.new(1, 1, 1) or tColor
-                        esp.team.Position = Vector2.new(t2d.X, t2d.Y - 16)
-                        esp.team.Visible = settings.espTeams
-                        
-                        local tool = char:FindFirstChildOfClass("Tool")
-                        local nText = player.Name
-                        if tool then nText = nText .. "\n[" .. tool.Name .. "]" end
-                        
-                        esp.name.Text = nText
-                        esp.name.Position = Vector2.new(t2d.X, t2d.Y + h + 3)
-                        esp.name.Visible = settings.espNames
+                    if settings.esp then
+                        local b2d, onB = Camera:WorldToViewportPoint(rPos - Vector3.new(0, 3, 0))
+                        local t2d, onT = Camera:WorldToViewportPoint(char.Head.Position + Vector3.new(0, 0.5, 0))
 
-                        local nameOffset = tool and 28 or 14
-                        esp.dist.Text = math.floor((Camera.CFrame.Position - rPos).Magnitude).."m"
-                        esp.dist.Position = Vector2.new(t2d.X, t2d.Y + h + 3 + nameOffset)
-                        esp.dist.Visible = settings.espDist
+                        if (onB or onT) and b2d.Z > 0 then
+                            local h = math.abs(b2d.Y - t2d.Y)
+                            local w = h / 1.5
+                            
+                            esp.box.Size = Vector2.new(w, h)
+                            esp.box.Position = Vector2.new(t2d.X - w/2, t2d.Y)
+                            esp.box.Color = tColor; esp.box.Visible = settings.espBoxes
+                            
+                            esp.health.Text = math.floor(char.Humanoid.Health).." HP"
+                            esp.health.Position = Vector2.new(t2d.X - w/2 - 25, t2d.Y + (h/2) - 6)
+                            esp.health.Visible = settings.espHealth
+                            
+                            esp.team.Text = tName
+                            esp.team.Color = settings.espTeamsWhite and Color3.new(1, 1, 1) or tColor
+                            esp.team.Position = Vector2.new(t2d.X, t2d.Y - 16)
+                            esp.team.Visible = settings.espTeams
+                            
+                            local tool = char:FindFirstChildOfClass("Tool")
+                            local nText = player.Name
+                            if tool then nText = nText .. "\n[" .. tool.Name .. "]" end
+                            
+                            esp.name.Text = nText
+                            esp.name.Position = Vector2.new(t2d.X, t2d.Y + h + 3)
+                            esp.name.Visible = settings.espNames
+
+                            local nameOffset = tool and 28 or 14
+                            esp.dist.Text = math.floor((Camera.CFrame.Position - rPos).Magnitude).."m"
+                            esp.dist.Position = Vector2.new(t2d.X, t2d.Y + h + 3 + nameOffset)
+                            esp.dist.Visible = settings.espDist
+                        else
+                            esp.box.Visible = false
+                            esp.health.Visible = false
+                            esp.team.Visible = false
+                            esp.name.Visible = false
+                            esp.dist.Visible = false
+                        end
                     else
                         esp.box.Visible = false
                         esp.health.Visible = false
@@ -2550,7 +2612,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                     esp.team.Visible = false
                     esp.name.Visible = false
                     esp.dist.Visible = false
-                    tracer.Visible = false
+                    esp.chams.Enabled = false
                 end
             else
                 esp.box.Visible = false
@@ -2735,10 +2797,13 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                 sysCache.uavs = pw and pw:GetChildren() or {}
                 local tw = gs:FindFirstChild("Tank Workspace")
                 sysCache.ugvs = tw and tw:GetChildren() or {}
+                local dw = gs:FindFirstChild("Drone Workspace") or gs:FindFirstChild("drone workspace")
+                sysCache.drones = dw and dw:GetChildren() or {}
             else
                 sysCache.subs = {}
                 sysCache.uavs = {}
                 sysCache.ugvs = {}
+                sysCache.drones = {}
             end
             for mdl, _ in pairs(entityDataCache) do
                 if not mdl.Parent then entityDataCache[mdl] = nil end
@@ -3037,27 +3102,130 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                 if ugvDrawings[i].chams then ugvDrawings[i].chams.Enabled = false end
             end) end
         end
+
+        if settings.droneEsp then
+            local currentDrones = {}
+            for _, obj in ipairs(sysCache.drones) do if obj:IsA("Model") then table.insert(currentDrones, obj) end end
+            for i, model in ipairs(currentDrones) do
+                if not droneDrawings[i] then
+                    local dCham = Instance.new("Highlight")
+                    dCham.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    dCham.FillTransparency = 0.5
+                    dCham.OutlineTransparency = 0
+                    dCham.FillColor = Color3.fromRGB(200, 150, 255)
+                    dCham.OutlineColor = Color3.new(1,1,1)
+                    pcall(function() dCham.Parent = game:GetService("CoreGui") end)
+
+                    droneDrawings[i] = { 
+                        box = createDrawing("Square", {Thickness = 1, Color = Color3.fromRGB(200, 150, 255), Filled = false, Visible = false}), 
+                        text = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(200, 150, 255), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
+                        healthText = createDrawing("Text", {Center = true, Size = 14, Font = 2, Color = Color3.fromRGB(100, 255, 100), Outline = true, OutlineColor = Color3.new(0, 0, 0), Visible = false}),
+                        chams = dCham
+                    }
+                end
+                pcall(function()
+                    local isAlive, currentHp, hasHealth = checkEntityHealth(model)
+                    if not isAlive then
+                        droneDrawings[i].box.Visible = false
+                        droneDrawings[i].text.Visible = false
+                        droneDrawings[i].healthText.Visible = false
+                        droneDrawings[i].chams.Enabled = false
+                        return
+                    end
+                    
+                    local hTxt = ""
+                    if hasHealth then hTxt = math.floor(currentHp) .. " HP" end
+                    
+                    local cf, size = model:GetBoundingBox()
+                    local mData = getEntityData(model)
+                    if mData and mData.anchor then
+                        cf = mData.anchor.CFrame * mData.offset
+                        size = mData.size
+                    end
+                    
+                    local bbox = get2DBoundingBox(cf, size, 0.65)
+                    
+                    if bbox then
+                        droneDrawings[i].chams.Adornee = model
+                        droneDrawings[i].chams.Enabled = true
+                        droneDrawings[i].box.Visible = false
+                        
+                        if bbox.allInFront then
+                            droneDrawings[i].box.Size = Vector2.new(bbox.maxX - bbox.minX, bbox.maxY - bbox.minY)
+                            droneDrawings[i].box.Position = Vector2.new(bbox.minX, bbox.minY)
+                            local dist = math.floor((Camera.CFrame.Position - cf.Position).Magnitude)
+                            droneDrawings[i].text.Text = "" .. model.Name .. "  |  " .. dist .. "m"
+                            droneDrawings[i].text.Position = Vector2.new(bbox.minX + (bbox.maxX - bbox.minX)/2, bbox.maxY + 5)
+                            droneDrawings[i].text.Visible = true
+
+                            if hTxt ~= "" then
+                                droneDrawings[i].healthText.Text = hTxt
+                                droneDrawings[i].healthText.Position = Vector2.new(bbox.minX + (bbox.maxX - bbox.minX)/2, bbox.minY - 17)
+                                droneDrawings[i].healthText.Visible = true
+                            else
+                                droneDrawings[i].healthText.Visible = false
+                            end
+                        else
+                            if bbox.centerOnScreen then
+                                local dist = math.floor((Camera.CFrame.Position - cf.Position).Magnitude)
+                                droneDrawings[i].text.Text = "" .. model.Name .. "  |  " .. dist .. "m"
+                                droneDrawings[i].text.Position = Vector2.new(bbox.centerPos.X, bbox.centerPos.Y)
+                                droneDrawings[i].text.Visible = true 
+                                
+                                if hTxt ~= "" then
+                                    droneDrawings[i].healthText.Text = hTxt
+                                    droneDrawings[i].healthText.Position = Vector2.new(bbox.centerPos.X, bbox.centerPos.Y - 17)
+                                    droneDrawings[i].healthText.Visible = true
+                                else
+                                    droneDrawings[i].healthText.Visible = false
+                                end
+                            else 
+                                droneDrawings[i].text.Visible = false 
+                                droneDrawings[i].healthText.Visible = false 
+                            end
+                        end
+                    else
+                        droneDrawings[i].chams.Enabled = false
+                        droneDrawings[i].box.Visible = false
+                        droneDrawings[i].text.Visible = false
+                        droneDrawings[i].healthText.Visible = false
+                    end
+                end)
+            end
+            for i = #currentDrones + 1, #droneDrawings do pcall(function() 
+                droneDrawings[i].box.Visible = false
+                droneDrawings[i].text.Visible = false
+                if droneDrawings[i].healthText then droneDrawings[i].healthText.Visible = false end 
+                if droneDrawings[i].chams then droneDrawings[i].chams.Enabled = false end
+            end) end
+        end
     end
 end))
 
 task.spawn(function()
+    local function getTycoonPath()
+        if not LocalPlayer.Team then return nil end
+        local t = workspace:FindFirstChild("Tycoon")
+        t = t and t:FindFirstChild("Tycoons")
+        t = t and t:FindFirstChild(LocalPlayer.Team.Name)
+        return t and t:FindFirstChild("UnpurchasedButtons")
+    end
+    local function getCash()
+        local ls = LocalPlayer:FindFirstChild("leaderstats")
+        local c = ls and ls:FindFirstChild("Cash")
+        return tonumber(c and c.Value or 0) or 0
+    end
+    local function getRebirths()
+        local ls = LocalPlayer:FindFirstChild("leaderstats")
+        local r = ls and (ls:FindFirstChild("Rebirths") or ls:FindFirstChild("Rebirth"))
+        return tonumber(r and r.Value or 0) or 0
+    end
+
     while isScriptActive do
-        task.wait(0.3)
+        task.wait(0.005)
         if settings.autoBuild then
-            local function getTycoonPath()
-                if not LocalPlayer.Team then return nil end
-                local t = workspace:FindFirstChild("Tycoon")
-                t = t and t:FindFirstChild("Tycoons")
-                t = t and t:FindFirstChild(LocalPlayer.Team.Name)
-                return t and t:FindFirstChild("UnpurchasedButtons")
-            end
-            local function getCash()
-                local ls = LocalPlayer:FindFirstChild("leaderstats")
-                local c = ls and ls:FindFirstChild("Cash")
-                return tonumber(c and c.Value or 0) or 0
-            end
-            
             local cash = getCash()
+            local plyRebirths = getRebirths()
             local path = getTycoonPath()
             local buttons = {}
             
@@ -3066,9 +3234,36 @@ task.spawn(function()
                     if model:IsA("Model") then
                         local t = model:GetAttribute("ButtonType")
                         local neon = model:FindFirstChild("Neon") or model:FindFirstChildWhichIsA("BasePart")
-                        if (t == "Money" or t == "Cash") and neon then
-                            local price = tonumber(model:GetAttribute("Price") or 0) or 0
-                            table.insert(buttons, {model = model, neon = neon, price = price})
+                        local isRebirthType = (t == "Rebirth" or string.find(string.lower(model.Name), "rebirth") ~= nil)
+                        
+                        if (t == "Money" or t == "Cash" or isRebirthType) and neon then
+                            local price = tonumber(model:GetAttribute("Price")) or tonumber(model:GetAttribute("Cost")) or 0
+                            local reqRebirths = tonumber(model:GetAttribute("Rebirths")) or tonumber(model:GetAttribute("Rebirth")) or tonumber(model:GetAttribute("RebirthRequirement")) or 0
+                            
+                            local textLbl = model:FindFirstChildWhichIsA("TextLabel", true) or model:FindFirstChildWhichIsA("TextButton", true)
+                            local btnText = textLbl and textLbl.Text or ""
+                            local lowerText = string.lower(btnText)
+                            local lowerName = string.lower(model.Name)
+                            
+                            if reqRebirths == 0 then
+                                local rMatch = string.match(lowerName, "(%d+)%s*rebirth") or string.match(lowerText, "(%d+)%s*rebirth")
+                                if rMatch then reqRebirths = tonumber(rMatch) end
+                            end
+                            
+                            if price == 0 then
+                                local val = model:FindFirstChildWhichIsA("IntValue", true)
+                                if val then price = val.Value end
+                            end
+                            if price == 0 and btnText ~= "" then
+                                for numStr in string.gmatch(btnText, "%d[%d,]*") do
+                                    local parsed = tonumber((string.gsub(numStr, ",", "")))
+                                    if parsed and parsed > price and parsed ~= reqRebirths then 
+                                        price = parsed 
+                                    end
+                                end
+                            end
+                            
+                            table.insert(buttons, {model = model, neon = neon, price = price, reqRebirths = reqRebirths, isRebirth = isRebirthType})
                         end
                     end
                 end
@@ -3076,7 +3271,7 @@ task.spawn(function()
             
             local affordable = {}
             for _, btn in ipairs(buttons) do
-                if cash >= btn.price then
+                if cash >= btn.price and plyRebirths >= btn.reqRebirths then
                     table.insert(affordable, btn)
                 end
             end
@@ -3084,7 +3279,11 @@ task.spawn(function()
             local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
                 if #affordable > 0 then
-                    table.sort(affordable, function(a, b) return a.price < b.price end)
+                    table.sort(affordable, function(a, b)
+                        if a.isRebirth and not b.isRebirth then return true end
+                        if not a.isRebirth and b.isRebirth then return false end
+                        return a.price < b.price
+                    end)
                     local targetBtn = affordable[1]
                     while targetBtn.model.Parent and settings.autoBuild and isScriptActive do
                         hrp.CFrame = CFrame.new(targetBtn.neon.Position + Vector3.new(0, 0, 0))
@@ -3145,12 +3344,13 @@ task.spawn(function()
                     local oil = t and t:FindFirstChild("Essentials") and t.Essentials:FindFirstChild("Oil Collector")
                     local part = oil and oil:FindFirstChild("Persistant") and oil.Persistant:FindFirstChild("CratePromptPart")
                     local prompt = part and part:FindFirstChildWhichIsA("ProximityPrompt", true)
-                    if prompt and part then
+                    
+                    if prompt and part and oil then
                         hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
                         hrp.Velocity = Vector3.new(0,0,0)
                         task.wait(0.2)
                         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                        task.wait(3.1)
+                        task.wait(3.2)
                         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
                     end
                 else
@@ -3163,9 +3363,21 @@ task.spawn(function()
                             if item:IsA("Model") and not item:GetAttribute("Disabled") and item:GetAttribute("Owner") ~= LocalPlayer.Name then
                                 local part = item:FindFirstChild("MainPart") or item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")
                                 if part then
-                                    local dist = (part.Position - hrp.Position).Magnitude
-                                    if dist < bestDist then
-                                        bestDist = dist; targetCrate = item
+                                    local playerNear = false
+                                    for _, p in ipairs(Players:GetPlayers()) do
+                                        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                                            if (p.Character.HumanoidRootPart.Position - part.Position).Magnitude <= 115 then
+                                                playerNear = true
+                                                break
+                                            end
+                                        end
+                                    end
+                                    
+                                    if not playerNear then
+                                        local dist = (part.Position - hrp.Position).Magnitude
+                                        if dist < bestDist then
+                                            bestDist = dist; targetCrate = item
+                                        end
                                     end
                                 end
                             end
@@ -3178,7 +3390,7 @@ task.spawn(function()
                             hrp.Velocity = Vector3.new(0,0,0)
                             task.wait(0.2)
                             VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                            task.wait(3.1)
+                            task.wait(3.2)
                             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
                         end
                     end
@@ -3204,12 +3416,13 @@ task.spawn(function()
                     local oil = t and t:FindFirstChild("Essentials") and t.Essentials:FindFirstChild("Oil Collector")
                     local part = oil and oil:FindFirstChild("Persistant") and oil.Persistant:FindFirstChild("CratePromptPart")
                     local prompt = part and part:FindFirstChildWhichIsA("ProximityPrompt", true)
-                    if prompt and part then
-                        hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
+                    
+                    if prompt and part and oil then
+                        hrp.CFrame = part.CFrame + Vector3.new(0, 6, 0)
                         hrp.Velocity = Vector3.new(0,0,0)
                         task.wait(0.2)
                         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                        task.wait(3.1)
+                        task.wait(3.2)
                         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
                     end
                 else
@@ -3222,9 +3435,21 @@ task.spawn(function()
                             if item:IsA("Model") and string.find(string.lower(item.Name), "oil rig") and not item:GetAttribute("Disabled") and item:GetAttribute("Owner") ~= LocalPlayer.Name then
                                 local part = item:FindFirstChild("MainPart") or item:FindFirstChild("mainpart")
                                 if part then
-                                    local dist = (part.Position - hrp.Position).Magnitude
-                                    if dist < bestDist then
-                                        bestDist = dist; targetOil = item
+                                    local playerNear = false
+                                    for _, p in ipairs(Players:GetPlayers()) do
+                                        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                                            if (p.Character.HumanoidRootPart.Position - part.Position).Magnitude <= 115 then
+                                                playerNear = true
+                                                break
+                                            end
+                                        end
+                                    end
+                                    
+                                    if not playerNear then
+                                        local dist = (part.Position - hrp.Position).Magnitude
+                                        if dist < bestDist then
+                                            bestDist = dist; targetOil = item
+                                        end
                                     end
                                 end
                             end
@@ -3233,11 +3458,11 @@ task.spawn(function()
                     if targetOil then
                         local part = targetOil:FindFirstChild("MainPart") or targetOil:FindFirstChild("mainpart")
                         if part then
-                            hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
+                            hrp.CFrame = part.CFrame + Vector3.new(0, 6, 0)
                             hrp.Velocity = Vector3.new(0,0,0)
                             task.wait(0.2)
                             VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                            task.wait(3.1)
+                            task.wait(3.2)
                             VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
                         end
                     end
@@ -3272,11 +3497,7 @@ task.spawn(function()
                 local hrp = char and char:FindFirstChild("HumanoidRootPart")
                 local hum = char and char:FindFirstChild("Humanoid")
                 
-                local function checkAlive()
-                    return hum and hum.Health > 0 and isScriptActive
-                end
-                
-                if hrp and checkAlive() then
+                if hrp and hum and hum.Health > 0 and isScriptActive then
                     local originalPos = hrp.CFrame
                     local targetCF, targetSize = targetObj:GetBoundingBox()
                     
