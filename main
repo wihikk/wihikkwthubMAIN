@@ -3432,7 +3432,7 @@ task.spawn(function()
                     local bestDist = math.huge
                     if oilFolder then
                         for _, item in ipairs(oilFolder:GetChildren()) do
-                            if item:IsA("Model") and string.find(string.lower(item.Name), "oil rig") and not item:GetAttribute("Disabled") and item:GetAttribute("Owner") ~= LocalPlayer.Name then
+                            if item:IsA("Model") and not item:GetAttribute("Disabled") and item:GetAttribute("Owner") ~= LocalPlayer.Name then
                                 local part = item:FindFirstChild("MainPart") or item:FindFirstChild("mainpart")
                                 if part then
                                     local playerNear = false
