@@ -36,6 +36,7 @@ local baseSpawnCFrame = nil
 local customSpawnCFrame = nil
 local wasNoclip = false
 local wasFlying = false
+local flyEnabledNoFallDmg = false
 local isMiscPageOpen = false
 local devToolsUnlocked = false
 local activeTarget = nil
@@ -56,8 +57,6 @@ local entityDataCache = {}
 local freecamPos, freecamYaw, freecamPitch
 local freecamActive = false
 local freecamKeys = {}
-
-local _antilag_sweep
 
 table.insert(scriptConnections, UserInputService.InputBegan:Connect(function(i, gp) if not gp then freecamKeys[i.KeyCode] = true end end))
 table.insert(scriptConnections, UserInputService.InputEnded:Connect(function(i) freecamKeys[i.KeyCode] = false end))
@@ -475,7 +474,7 @@ StatsContainer.Size = UDim2.new(0, 130, 0, 24)
 StatsContainer.ClipsDescendants = true
 Instance.new("UICorner", StatsContainer).CornerRadius = UDim.new(0, 6)
 
-TweenService:Create(StatsContainer, TweenInfo.new(0.4, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = UDim2.new(0, 16, 0, 46)}):Play()
+TweenService:Create(StatsContainer, TweenInfo.new(0.6, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = UDim2.new(0, 16, 0, 46)}):Play()
 
 local StatsStroke = Instance.new("UIStroke", StatsContainer)
 StatsStroke.Color = Theme.Border
@@ -548,6 +547,16 @@ local framesCount = 0
 local lastFps = 0
 local lastPing = 0
 
+local fpsTweenOut = TweenService:Create(FpsValue, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 0.4})
+local fpsTweenIn = TweenService:Create(FpsValue, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {TextTransparency = 0})
+
+local pingTweenOut = TweenService:Create(PingValue, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 0.4})
+local pingTweenIn = TweenService:Create(PingValue, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {TextTransparency = 0})
+
+fpsTweenOut.Completed:Connect(function() fpsTweenIn:Play() end)
+pingTweenOut.Completed:Connect(function() pingTweenIn:Play() end)
+
+
 table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
     framesCount = framesCount + 1
     local now = tick()
@@ -556,12 +565,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
         if currentFps ~= lastFps then
             FpsValue.Text = tostring(currentFps)
             lastFps = currentFps
-            pcall(function()
-                local t1 = TweenService:Create(FpsValue, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 0.4})
-                local t2 = TweenService:Create(FpsValue, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {TextTransparency = 0})
-                t1:Play()
-                t1.Completed:Connect(function() t2:Play() end)
-            end)
+            pcall(function() fpsTweenOut:Play() end)
         end
         local ping = 0
         pcall(function() ping = math.floor(LocalPlayer:GetNetworkPing() * 1000) end)
@@ -569,17 +573,13 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
         if ping ~= lastPing then
             PingValue.Text = tostring(ping)
             lastPing = ping
-            pcall(function()
-                local p1 = TweenService:Create(PingValue, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {TextTransparency = 0.4})
-                local p2 = TweenService:Create(PingValue, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {TextTransparency = 0})
-                p1:Play()
-                p1.Completed:Connect(function() p2:Play() end)
-            end)
+            pcall(function() pingTweenOut:Play() end)
         end
         framesCount = 0
         lastStatsUpdate = now
     end
 end))
+
 local VehHealthLabel = Instance.new("TextLabel", StatsGui)
 VehHealthLabel.Size = UDim2.new(0, 200, 0, 30)
 VehHealthLabel.AnchorPoint = Vector2.new(1, 1)
@@ -592,10 +592,12 @@ VehHealthLabel.TextSize = 18
 VehHealthLabel.TextXAlignment = Enum.TextXAlignment.Right
 VehHealthLabel.TextTransparency = 1
 VehHealthLabel.Visible = false
+
 local VehHealthStroke = Instance.new("UIStroke", VehHealthLabel)
 VehHealthStroke.Color = Color3.new(0, 0, 0)
 VehHealthStroke.Thickness = 1.5
 VehHealthStroke.Transparency = 1
+
 local isVehHealthVisible = false
 table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
@@ -870,7 +872,7 @@ Instance.new("UICorner", BtnPath).CornerRadius = UDim.new(0, 4)
 Instance.new("UIStroke", BtnPath).Color = Theme.Border
 
 local BtnTeamVeh = Instance.new("TextButton", DevPanel)
-BtnTeamVeh.Size = UDim2.new(1, -20, 0, 30)
+BtnTeamVeh.Size = UDim2.new(0.5, -15, 0, 30)
 BtnTeamVeh.Position = UDim2.new(0, 10, 0, 85)
 BtnTeamVeh.BackgroundColor3 = settings.showTeamVehicles and Theme.Accent or Theme.OffColor
 BtnTeamVeh.Text = "Your Vehicle"
@@ -891,6 +893,24 @@ end
 
 BtnTeamVeh.MouseButton1Click:Connect(function()
     uiUpdaters.showTeamVehicles(not settings.showTeamVehicles)
+end)
+
+local BtnMoondex = Instance.new("TextButton", DevPanel)
+BtnMoondex.Size = UDim2.new(0.5, -15, 0, 30)
+BtnMoondex.Position = UDim2.new(0.5, 5, 0, 85)
+BtnMoondex.BackgroundColor3 = Theme.OffColor
+BtnMoondex.Text = "Moondex"
+BtnMoondex.TextColor3 = Theme.TextMain
+BtnMoondex.Font = Enum.Font.GothamMedium
+BtnMoondex.TextSize = 12
+BtnMoondex.ZIndex = 71
+Instance.new("UICorner", BtnMoondex).CornerRadius = UDim.new(0, 4)
+Instance.new("UIStroke", BtnMoondex).Color = Theme.Border
+
+BtnMoondex.MouseButton1Click:Connect(function()
+    TweenService:Create(BtnMoondex, TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.fromRGB(0,0,0)}):Play()
+    task.delay(0.1, function() TweenService:Create(BtnMoondex, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.OffColor, TextColor3 = Theme.TextMain}):Play() end)
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"))()
 end)
 
 local XYZFrame = Instance.new("Frame", ScreenGui)
@@ -1535,28 +1555,36 @@ createToggle("Noclip", MovementGroup, "noclip")
 createToggle("Infinite Jump", MovementGroup, "infiniteJump")
 
 local noFallDmgConn
-createToggle("No fall damage", MovementGroup, "noFallDmg", function(state)
+
+local function updateNoFallDmgState(state)
+    settings.noFallDmg = state
     if state then
-        noFallDmgConn = RunService.Heartbeat:Connect(function()
-            local char = LocalPlayer.Character
-            if char then
-                local preventEvent = char:FindFirstChild("PreventFallDamageBindableEvent")
-                if preventEvent and preventEvent:IsA("BindableEvent") then
-                    preventEvent:Fire()
+        if not noFallDmgConn then
+            noFallDmgConn = RunService.Heartbeat:Connect(function()
+                local char = LocalPlayer.Character
+                if char then
+                    local preventEvent = char:FindFirstChild("PreventFallDamageBindableEvent")
+                    if preventEvent and preventEvent:IsA("BindableEvent") then
+                        preventEvent:Fire()
+                    end
                 end
-            end
-        end)
+            end)
+        end
     else
         if noFallDmgConn then
             noFallDmgConn:Disconnect()
             noFallDmgConn = nil
         end
     end
+end
+
+createToggle("No fall damage", MovementGroup, "noFallDmg", function(state)
+    updateNoFallDmgState(state)
 end)
 
 local FlyGroup = createGroup(Pages.PlayerLeft)
 createToggle("Fly", FlyGroup, "fly")
-createSlider("Fly Speed", FlyGroup, 5, 500, settings.flySpeed, 5, "flySpeed")
+createSlider("Fly Speed", FlyGroup, 5, 1000, settings.flySpeed, 5, "flySpeed")
 
 local WalkspeedGroup = createGroup(Pages.PlayerLeft)
 createToggle("Custom Walkspeed", WalkspeedGroup, "customWalkspeed", function(state)
@@ -1565,7 +1593,7 @@ createToggle("Custom Walkspeed", WalkspeedGroup, "customWalkspeed", function(sta
         if hum then hum.WalkSpeed = 16 end
     end
 end)
-createSlider("Walkspeed Value", WalkspeedGroup, 16, 500, settings.walkspeedValue, 1, "walkspeedValue")
+createSlider("Walkspeed Value", WalkspeedGroup, 16, 1000, settings.walkspeedValue, 1, "walkspeedValue")
 
 local MiscCombatGroup = createGroup(Pages.CombatRight)
 createToggle("Hitbox Expander", MiscCombatGroup, "hitboxExpander", function(state)
@@ -1841,6 +1869,7 @@ end)
 pcall(function()
     table.insert(scriptConnections, Players.PlayerAdded:Connect(trackPlayer))
     table.insert(scriptConnections, Players.PlayerRemoving:Connect(function(plr) pcall(function() updatePlayerRow(plr.Name) end) end))
+    chams.Adornee = nil
 end)
 
 local sprintConns = {}
@@ -2025,7 +2054,7 @@ createKeybind("Free Cam Bind", BindsGroup, "freeCam")
 local ClientGroup = createGroup(Pages.MiscLeft)
 createToggle("Anti AFK", ClientGroup, "antiAfk")
 createToggle("Free Cam", ClientGroup, "freeCam")
-createSlider("Free Cam Speed", ClientGroup, 5, 500, settings.freeCamSpeed, 5, "freeCamSpeed")
+createSlider("Free Cam Speed", ClientGroup, 5, 1000, settings.freeCamSpeed, 5, "freeCamSpeed")
 
 task.spawn(function()
     while isScriptActive do
@@ -2040,23 +2069,6 @@ task.spawn(function()
         end
     end
 end)
-
-local function killEffect(d)
-    if d:IsA("ParticleEmitter") or d:IsA("Trail") or d:IsA("Beam") or d:IsA("Smoke") or d:IsA("Fire") or d:IsA("Sparkles") then
-        if settings.noExplosions then d.Enabled = false end
-    end
-end
-
-_antilag_sweep = function()
-    task.spawn(function()
-        local count = 0
-        for _, d in ipairs(workspace:GetDescendants()) do 
-            if settings.noExplosions then pcall(killEffect, d) end 
-            count = count + 1
-            if count % 1000 == 0 then task.wait() end
-        end
-    end)
-end
 
 local gs = workspace:FindFirstChild("Game Systems")
 local expFolder = gs and gs:FindFirstChild("Explosions")
@@ -2183,6 +2195,11 @@ RInput:GetPropertyChangedSignal("Text"):Connect(function()
         RChangeBtn.BackgroundColor3 = Theme.OffColor
     elseif txt == "" then
         RWarning.Text = "it cant be empty"
+        RWarning.Visible = true
+        RChangeBtn.TextColor3 = Theme.TextSub
+        RChangeBtn.BackgroundColor3 = Theme.OffColor
+    elseif isfile and isfile("PlayerCfg_"..txt..".json") then
+        RWarning.Text = "This config already exist"
         RWarning.Visible = true
         RChangeBtn.TextColor3 = Theme.TextSub
         RChangeBtn.BackgroundColor3 = Theme.OffColor
@@ -2388,14 +2405,46 @@ refreshConfigs = function(forceRefresh)
                 SelectBtn.MouseButton1Click:Connect(function()
                     currentConfigName = cfgName
                     if ConfigTextBox then ConfigTextBox.Text = cfgName end
+                    for _, child in ipairs(ConfigList:GetChildren()) do
+                        if child:IsA("Frame") then
+                            local stroke = child:FindFirstChildOfClass("UIStroke")
+                            local selectBtn = child:FindFirstChild("TextButton")
+                            if stroke and selectBtn then
+                                local targetTrans = (selectBtn.Text == currentConfigName) and 0 or 1
+                                TweenService:Create(stroke, TweenInfo.new(0.3), {Transparency = targetTrans}):Play()
+                            end
+                        end
+                    end
+                end)
+
+                EditBtn.MouseButton1Click:Connect(function()
+                    targetRenameCfg = cfgName
+                    RInput.Text = cfgName
+                    RenameModal.Visible = true
+                end)
+
+                FavBtn.MouseButton1Click:Connect(function()
+                    favorites[cfgName] = not favorites[cfgName]
+                    pcall(function() writefile("Player_Favorites.json", HttpService:JSONEncode(favorites)) end)
+                    refreshConfigs(true)
+                end)
+
+                DelBtn.MouseButton1Click:Connect(function()
+                    pcall(function() delfile("PlayerCfg_"..cfgName..".json") end)
+                    if favorites[cfgName] ~= nil then
+                        favorites[cfgName] = nil
+                        pcall(function() writefile("Player_Favorites.json", HttpService:JSONEncode(favorites)) end)
+                    end
+                    if currentConfigName == cfgName then
+                        currentConfigName = "default"
+                        if ConfigTextBox then ConfigTextBox.Text = "" end
+                    end
                     refreshConfigs(true)
                 end)
             end    
         end)
     end)
 end
-
-createActionButton("Refresh Config List", ConfigGroup, function() refreshConfigs(true) end)
 
 task.spawn(function()
     task.wait(0.5)
@@ -2446,7 +2495,7 @@ task.spawn(function()
     doLoadConfig()
     
     while isScriptActive do
-        task.wait(0.01)
+        task.wait(0.1)
         if isMiscPageOpen then
             pcall(function() refreshConfigs(false) end)
         end
@@ -2533,6 +2582,12 @@ end
 local function UnloadScript()
     isScriptActive = false 
     isLoaded = false
+
+    updateNoFallDmgState(false)
+    if noFallDmgConn then
+        noFallDmgConn:Disconnect()
+        noFallDmgConn = nil
+    end
     
     for _, connection in pairs(scriptConnections) do pcall(function() connection:Disconnect() end) end
     table.clear(scriptConnections)
@@ -2672,12 +2727,9 @@ table.insert(scriptConnections, RunService.Stepped:Connect(function()
     local doingFly = settings.fly and not (hum and hum.SeatPart)
 
     if hrp then
-            if doingFly then
+        if doingFly then
             if not wasFlying then
                 wasFlying = true
-                if not settings.noFallDmg and uiUpdaters.noFallDmg then
-                    uiUpdaters.noFallDmg(true)
-                end
                 if char:FindFirstChild("Animate") then
                     char.Animate.Disabled = true
                 end
@@ -2777,12 +2829,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
     local trackDist = settings.aimbot and settings.fov or 150
     local closestForDamage = nil
 
-    local targetLocked = false
-    local mouseLoc = UserInputService:GetMouseLocation()
-    local trackDist = settings.aimbot and settings.fov or 150
-    local closestForDamage = nil
-
-    if settings.aimbot then
+        if settings.aimbot then
         FOVring.Visible = true
         FOVring.Radius = settings.fov
         FOVring.Position = mouseLoc
@@ -2819,19 +2866,6 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
         end
     else
         FOVring.Visible = false
-        activeTarget = nil
-    end
-
-        if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) and activeTarget then
-            targetLocked = true 
-            local aimPos = activeTarget.Character.Head.Position
-            if settings.predict and activeTarget.Character:FindFirstChild("HumanoidRootPart") then
-                aimPos = aimPos + (activeTarget.Character.HumanoidRootPart.AssemblyLinearVelocity * (settings.predictStrength / 100))
-            else
-            local targetCFrame = CFrame.new(Camera.CFrame.Position, aimPos)
-            Camera.CFrame = settings.smoothness > 0 and Camera.CFrame:Lerp(targetCFrame, math.clamp((100 - settings.smoothness) / 100, 0.02, 1)) or targetCFrame
-        end
-    else
         activeTarget = nil
     end
 
@@ -2887,6 +2921,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                         esp.chams.OutlineColor = Color3.new(1,1,1)
                         esp.chams.Enabled = true
                     else
+                        esp.chams.Adornee = nil
                         esp.chams.Enabled = false
                     end
 
@@ -2943,6 +2978,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                     esp.team.Visible = false
                     esp.name.Visible = false
                     esp.dist.Visible = false
+                    esp.chams.Adornee = nil
                     esp.chams.Enabled = false
                 end
             else
@@ -2951,6 +2987,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                 esp.team.Visible = false
                 esp.name.Visible = false
                 esp.dist.Visible = false
+                esp.chams.Adornee = nil
                 esp.chams.Enabled = false
                 tracer.Visible = false
             end
@@ -2962,6 +2999,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
             esp.team.Visible = false
             esp.name.Visible = false
             esp.dist.Visible = false
+            esp.chams.Adornee = nil
             esp.chams.Enabled = false
         end
         for _, tracer in pairs(tracerObjects) do
@@ -3016,6 +3054,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                             vehicleDrawings[i].text.Visible = false
                             vehicleDrawings[i].healthText.Visible = false
                             vehicleDrawings[i].occText.Visible = false
+                            vehicleDrawings[i].chams.Adornee = nil
                             vehicleDrawings[i].chams.Enabled = false
                             return 
                         end
@@ -3092,6 +3131,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                                 end
                             end
                         else
+                        	vehicleDrawings[i].chams.Adornee = nil
                             vehicleDrawings[i].chams.Enabled = false
                             vehicleDrawings[i].box.Visible = false
                             vehicleDrawings[i].text.Visible = false
@@ -3161,6 +3201,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                         subDrawings[i].box.Visible = false
                         subDrawings[i].text.Visible = false
                         subDrawings[i].healthText.Visible = false
+                        subDrawings[i].chams.Adornee = nil
                         subDrawings[i].chams.Enabled = false
                         return
                     end
@@ -3217,6 +3258,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                             end
                         end
                     else
+                    	subDrawings[i].chams.Adornee = nil
                         subDrawings[i].chams.Enabled = false
                         subDrawings[i].box.Visible = false
                         subDrawings[i].text.Visible = false
@@ -3260,6 +3302,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                         uavDrawings[i].text.Visible = false
                         uavDrawings[i].healthText.Visible = false
                         uavDrawings[i].chams.Enabled = false
+                        uavDrawings[i].chams.Adornee = nil
                         return
                     end
                     
@@ -3315,6 +3358,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                             end
                         end
                     else
+                    	uavDrawings[i].chams.Adornee = nil
                         uavDrawings[i].chams.Enabled = false
                         uavDrawings[i].box.Visible = false
                         uavDrawings[i].text.Visible = false
@@ -3326,7 +3370,10 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                 uavDrawings[i].box.Visible = false
                 uavDrawings[i].text.Visible = false 
                 if uavDrawings[i].healthText then uavDrawings[i].healthText.Visible = false end
-                if uavDrawings[i].chams then uavDrawings[i].chams.Enabled = false end
+                if uavDrawings[i].chams then 
+                    uavDrawings[i].chams.Enabled = false
+                    uavDrawings[i].chams.Adornee = nil
+                end
             end) end
         end
 
@@ -3357,6 +3404,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                         ugvDrawings[i].box.Visible = false
                         ugvDrawings[i].text.Visible = false
                         ugvDrawings[i].healthText.Visible = false
+                        ugvDrawings[i].chams.Adornee = nil
                         ugvDrawings[i].chams.Enabled = false
                         return
                     end
@@ -3413,6 +3461,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                             end
                         end
                     else
+                    	ugvDrawings[i].chams.Adornee = nil
                         ugvDrawings[i].chams.Enabled = false
                         ugvDrawings[i].box.Visible = false
                         ugvDrawings[i].text.Visible = false
@@ -3454,6 +3503,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                         droneDrawings[i].box.Visible = false
                         droneDrawings[i].text.Visible = false
                         droneDrawings[i].healthText.Visible = false
+                        droneDrawings[i].chams.Adornee = nil
                         droneDrawings[i].chams.Enabled = false
                         return
                     end
@@ -3510,6 +3560,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                             end
                         end
                     else
+                    	droneDrawings[i].chams.Adornee = nil
                         droneDrawings[i].chams.Enabled = false
                         droneDrawings[i].box.Visible = false
                         droneDrawings[i].text.Visible = false
@@ -3654,9 +3705,28 @@ task.spawn(function()
 end)
 
 task.spawn(function()
+    local function isPlayerNearby(pos, maxDist, ignorePlayer)
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= ignorePlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                if (p.Character.HumanoidRootPart.Position - pos).Magnitude <= maxDist then
+                    return true
+                end
+            end
+        end
+        return false
+    end
+
+    local wasAutoCrates = false
+    local firstCrateTurnIn = true
+
     while isScriptActive do
         task.wait(0.15)
         if settings.autoCrates then
+            if not wasAutoCrates then
+                firstCrateTurnIn = true
+                wasAutoCrates = true
+            end
+            
             local char = LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             local hum = char and char:FindFirstChild("Humanoid")
@@ -3673,10 +3743,16 @@ task.spawn(function()
                     if prompt and part and oil then
                         hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
                         hrp.Velocity = Vector3.new(0,0,0)
-                        task.wait(0.2)
+                        
+                        if not firstCrateTurnIn then
+                            task.wait(1.5)
+                        end
+                        
                         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
                         task.wait(3.2)
                         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                        
+                        firstCrateTurnIn = false
                     end
                 else
                     local col = workspace:FindFirstChild("Game Systems") and workspace["Game Systems"]:FindFirstChild("Collectibles Workspace")
@@ -3685,23 +3761,19 @@ task.spawn(function()
                     local bestDist = math.huge
                     if cratesFolder then
                         for _, item in ipairs(cratesFolder:GetChildren()) do
-                            if item:IsA("Model") and not item:GetAttribute("Disabled") and item:GetAttribute("Owner") ~= LocalPlayer.Name then
+                            if item:IsA("Model") and not item:GetAttribute("Disabled") then
+                                local owner = item:GetAttribute("Owner")
+                                local team = item:GetAttribute("Team")
+                                if owner == LocalPlayer.Name or (LocalPlayer.Team and tostring(team) == LocalPlayer.Team.Name) then
+                                    continue
+                                end
                                 local part = item:FindFirstChild("MainPart") or item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")
                                 if part then
-                                    local playerNear = false
-                                    for _, p in ipairs(Players:GetPlayers()) do
-                                        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
-                                            if (p.Character.HumanoidRootPart.Position - part.Position).Magnitude <= 200 then
-                                                playerNear = true
-                                                break
-                                            end
-                                        end
-                                    end
-                                    
-                                    if not playerNear then
+                                    if not isPlayerNearby(part.Position, 200, nil) then
                                         local dist = (part.Position - hrp.Position).Magnitude
                                         if dist < bestDist then
-                                            bestDist = dist; targetCrate = item
+                                            bestDist = dist
+                                            targetCrate = item
                                         end
                                     end
                                 end
@@ -3713,22 +3785,74 @@ task.spawn(function()
                         if part then
                             hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
                             hrp.Velocity = Vector3.new(0,0,0)
-                            task.wait(0.2)
-                            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                            task.wait(3.2)
-                            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                            
+                            task.wait(0.1)
+                            if isPlayerNearby(part.Position, 200, LocalPlayer) then
+                                sendBindNotification("Someone is nearby crate!", false)
+                                if baseSpawnCFrame then
+                                    hrp.CFrame = baseSpawnCFrame
+                                else
+                                    hrp.CFrame = CFrame.new(-503, 177, -1021)
+                                end
+                                hrp.Velocity = Vector3.new(0,0,0)
+                            else
+                                task.wait(0.1)
+                                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                                local pickupStart = tick()
+                                local interrupted = false
+                                while (tick() - pickupStart) < 3.2 and isScriptActive do
+                                    if isPlayerNearby(part.Position, 200, LocalPlayer) then
+                                        interrupted = true
+                                        sendBindNotification("Someone is nearby crate!", false)
+                                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                                        if baseSpawnCFrame then
+                                            hrp.CFrame = baseSpawnCFrame
+                                        else
+                                            hrp.CFrame = CFrame.new(-503, 177, -1021)
+                                        end
+                                        hrp.Velocity = Vector3.new(0,0,0)
+                                        break
+                                    end
+                                    task.wait(0.1)
+                                end
+                                if not interrupted then
+                                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                                end
+                            end
                         end
                     end
                 end
             end
+        else
+            wasAutoCrates = false
+            firstCrateTurnIn = true
         end
     end
 end)
 
 task.spawn(function()
+    local function isPlayerNearby(pos, maxDist, ignorePlayer)
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= ignorePlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                if (p.Character.HumanoidRootPart.Position - pos).Magnitude <= maxDist then
+                    return true
+                end
+            end
+        end
+        return false
+    end
+
+    local wasAutoOil = false
+    local firstOilTurnIn = true
+
     while isScriptActive do
         task.wait(0.15)
         if settings.autoOil then
+            if not wasAutoOil then
+                firstOilTurnIn = true
+                wasAutoOil = true
+            end
+            
             local char = LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             local hum = char and char:FindFirstChild("Humanoid")
@@ -3745,10 +3869,16 @@ task.spawn(function()
                     if prompt and part and oil then
                         hrp.CFrame = part.CFrame + Vector3.new(0, 6, 0)
                         hrp.Velocity = Vector3.new(0,0,0)
-                        task.wait(0.2)
+                        
+                        if not firstOilTurnIn then
+                            task.wait(1.5)
+                        end
+                        
                         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
                         task.wait(3.2)
                         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                        
+                        firstOilTurnIn = false
                     end
                 else
                     local col = workspace:FindFirstChild("Game Systems") and workspace["Game Systems"]:FindFirstChild("Collectibles Workspace")
@@ -3757,23 +3887,19 @@ task.spawn(function()
                     local bestDist = math.huge
                     if oilFolder then
                         for _, item in ipairs(oilFolder:GetChildren()) do
-                            if item:IsA("Model") and not item:GetAttribute("Disabled") and item:GetAttribute("Owner") ~= LocalPlayer.Name then
+                            if item:IsA("Model") and not item:GetAttribute("Disabled") then
+                                local owner = item:GetAttribute("Owner")
+                                local team = item:GetAttribute("Team")
+                                if owner == LocalPlayer.Name or (LocalPlayer.Team and tostring(team) == LocalPlayer.Team.Name) then
+                                    continue
+                                end
                                 local part = item:FindFirstChild("MainPart") or item:FindFirstChild("mainpart")
                                 if part then
-                                    local playerNear = false
-                                    for _, p in ipairs(Players:GetPlayers()) do
-                                        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
-                                            if (p.Character.HumanoidRootPart.Position - part.Position).Magnitude <= 200 then
-                                                playerNear = true
-                                                break
-                                            end
-                                        end
-                                    end
-                                    
-                                    if not playerNear then
+                                    if not isPlayerNearby(part.Position, 200, nil) then
                                         local dist = (part.Position - hrp.Position).Magnitude
                                         if dist < bestDist then
-                                            bestDist = dist; targetOil = item
+                                            bestDist = dist
+                                            targetOil = item
                                         end
                                     end
                                 end
@@ -3785,14 +3911,47 @@ task.spawn(function()
                         if part then
                             hrp.CFrame = part.CFrame + Vector3.new(0, 6, 0)
                             hrp.Velocity = Vector3.new(0,0,0)
-                            task.wait(0.2)
-                            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                            task.wait(3.2)
-                            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                            
+                            task.wait(0.1)
+                            if isPlayerNearby(part.Position, 200, LocalPlayer) then
+                                sendBindNotification("Someone is nearby crate!", false)
+                                if baseSpawnCFrame then
+                                    hrp.CFrame = baseSpawnCFrame
+                                else
+                                    hrp.CFrame = CFrame.new(-503, 177, -1021)
+                                end
+                                hrp.Velocity = Vector3.new(0,0,0)
+                            else
+                                task.wait(0.1)
+                                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                                local pickupStart = tick()
+                                local interrupted = false
+                                while (tick() - pickupStart) < 3.2 and isScriptActive do
+                                    if isPlayerNearby(part.Position, 200, LocalPlayer) then
+                                        interrupted = true
+                                        sendBindNotification("Someone is nearby crate!", false)
+                                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                                        if baseSpawnCFrame then
+                                            hrp.CFrame = baseSpawnCFrame
+                                        else
+                                            hrp.CFrame = CFrame.new(-503, 177, -1021)
+                                        end
+                                        hrp.Velocity = Vector3.new(0,0,0)
+                                        break
+                                    end
+                                    task.wait(0.1)
+                                end
+                                if not interrupted then
+                                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                                end
+                            end
                         end
                     end
                 end
             end
+        else
+            wasAutoOil = false
+            firstOilTurnIn = true
         end
     end
 end)
