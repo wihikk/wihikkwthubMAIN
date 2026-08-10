@@ -57,6 +57,7 @@ local entityDataCache = {}
 local freecamPos, freecamYaw, freecamPitch
 local freecamActive = false
 local freecamKeys = {}
+local currentFreecamSpeed = 100
 
 table.insert(scriptConnections, UserInputService.InputBegan:Connect(function(i, gp) if not gp then freecamKeys[i.KeyCode] = true end end))
 table.insert(scriptConnections, UserInputService.InputEnded:Connect(function(i) freecamKeys[i.KeyCode] = false end))
@@ -2820,7 +2821,14 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
         if freecamKeys[Enum.KeyCode.D] then move = move + rot.RightVector end
         if freecamKeys[Enum.KeyCode.Space] then move = move + Vector3.new(0, 1, 0) end
         if freecamKeys[Enum.KeyCode.LeftControl] then move = move - Vector3.new(0, 1, 0) end
-        freecamPos = freecamPos + move * (settings.freeCamSpeed * frameDelay)
+        
+        local targetSpeed = settings.freeCamSpeed
+        if freecamKeys[Enum.KeyCode.LeftShift] then
+            targetSpeed = 1000
+        end
+        currentFreecamSpeed = currentFreecamSpeed + (targetSpeed - currentFreecamSpeed) * 0.15
+        
+        freecamPos = freecamPos + move * (currentFreecamSpeed * frameDelay)
         Camera.CFrame = CFrame.new(freecamPos) * rot
     end
 
