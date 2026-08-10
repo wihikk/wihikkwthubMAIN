@@ -1615,22 +1615,6 @@ WlCloseBtn.TextColor3 = Color3.fromRGB(130, 50, 50)
 WlCloseBtn.Font = Enum.Font.GothamBold
 WlCloseBtn.TextSize = 14
 
-local TailContainer = Instance.new("Frame", WhitelistWindow)
-TailContainer.Size = UDim2.new(0, 10, 0, 20)
-TailContainer.Position = UDim2.new(0, -10, 0.835, 0)
-TailContainer.BackgroundTransparency = 1
-TailContainer.ClipsDescendants = true
-TailContainer.ZIndex = 0
-
-local Tail = Instance.new("Frame", TailContainer)
-Tail.Size = UDim2.new(0, 14, 0, 14)
-Tail.AnchorPoint = Vector2.new(0.5, 0.5)
-Tail.Position = UDim2.new(1, 0, 0.5, 0)
-Tail.BackgroundColor3 = Theme.Background
-Tail.BackgroundTransparency = Theme.BackgroundTrans
-Tail.Rotation = 45
-Tail.BorderSizePixel = 0
-
 local ListScroll = Instance.new("ScrollingFrame", WhitelistWindow)
 ListScroll.Size = UDim2.new(1, -24, 1, -50)
 ListScroll.Position = UDim2.new(0, 12, 0, 30)
