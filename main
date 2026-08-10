@@ -3691,7 +3691,7 @@ task.spawn(function()
                                     local playerNear = false
                                     for _, p in ipairs(Players:GetPlayers()) do
                                         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
-                                            if (p.Character.HumanoidRootPart.Position - part.Position).Magnitude <= 115 then
+                                            if (p.Character.HumanoidRootPart.Position - part.Position).Magnitude <= 200 then
                                                 playerNear = true
                                                 break
                                             end
@@ -3763,7 +3763,7 @@ task.spawn(function()
                                     local playerNear = false
                                     for _, p in ipairs(Players:GetPlayers()) do
                                         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
-                                            if (p.Character.HumanoidRootPart.Position - part.Position).Magnitude <= 115 then
+                                            if (p.Character.HumanoidRootPart.Position - part.Position).Magnitude <= 200 then
                                                 playerNear = true
                                                 break
                                             end
