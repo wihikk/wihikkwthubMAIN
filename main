@@ -1534,6 +1534,26 @@ local MovementGroup = createGroup(Pages.PlayerRight)
 createToggle("Noclip", MovementGroup, "noclip")
 createToggle("Infinite Jump", MovementGroup, "infiniteJump")
 
+local noFallDmgConn
+createToggle("No fall damage", MovementGroup, "noFallDmg", function(state)
+    if state then
+        noFallDmgConn = RunService.Heartbeat:Connect(function()
+            local char = LocalPlayer.Character
+            if char then
+                local preventEvent = char:FindFirstChild("PreventFallDamageBindableEvent")
+                if preventEvent and preventEvent:IsA("BindableEvent") then
+                    preventEvent:Fire()
+                end
+            end
+        end)
+    else
+        if noFallDmgConn then
+            noFallDmgConn:Disconnect()
+            noFallDmgConn = nil
+        end
+    end
+end)
+
 local FlyGroup = createGroup(Pages.PlayerLeft)
 createToggle("Fly", FlyGroup, "fly")
 createSlider("Fly Speed", FlyGroup, 5, 500, settings.flySpeed, 5, "flySpeed")
@@ -1595,7 +1615,7 @@ Instance.new("UIStroke", ToggleBtn).Color = Theme.Border
 
 local WhitelistWindow = Instance.new("Frame", ScreenGui)
 WhitelistWindow.Name = "WhitelistMenu"
-WhitelistWindow.Size = UDim2.new(0, 346, 0, 373)
+WhitelistWindow.Size = UDim2.new(0, 0, 0, 373)
 WhitelistWindow.BackgroundColor3 = Theme.Background
 WhitelistWindow.BackgroundTransparency = Theme.BackgroundTrans
 WhitelistWindow.BorderSizePixel = 0
@@ -2028,9 +2048,14 @@ local function killEffect(d)
 end
 
 _antilag_sweep = function()
-    for _, d in ipairs(workspace:GetDescendants()) do 
-        if settings.noExplosions then pcall(killEffect, d) end 
-    end
+    task.spawn(function()
+        local count = 0
+        for _, d in ipairs(workspace:GetDescendants()) do 
+            if settings.noExplosions then pcall(killEffect, d) end 
+            count = count + 1
+            if count % 1000 == 0 then task.wait() end
+        end
+    end)
 end
 
 local gs = workspace:FindFirstChild("Game Systems")
@@ -2050,15 +2075,20 @@ createToggle("No Explosions & Particles", ClientGroup, "noExplosions", function(
     if state and _antilag_sweep then 
         _antilag_sweep() 
     elseif not state then
-        for _, d in ipairs(workspace:GetDescendants()) do
-            if d:IsA("ParticleEmitter") or d:IsA("Trail") or d:IsA("Beam") or d:IsA("Smoke") or d:IsA("Fire") or d:IsA("Sparkles") then
-                d.Enabled = true
-            elseif d:IsA("Explosion") then
-                d.Visible = true
-            elseif d:IsA("BasePart") and d:FindFirstAncestor("Explosions") then
-                d.Transparency = 0
+        task.spawn(function()
+            local count = 0
+            for _, d in ipairs(workspace:GetDescendants()) do
+                if d:IsA("ParticleEmitter") or d:IsA("Trail") or d:IsA("Beam") or d:IsA("Smoke") or d:IsA("Fire") or d:IsA("Sparkles") then
+                    d.Enabled = true
+                elseif d:IsA("Explosion") then
+                    d.Visible = true
+                elseif d:IsA("BasePart") and d:FindFirstAncestor("Explosions") then
+                    d.Transparency = 0
+                end
+                count = count + 1
+                if count % 1000 == 0 then task.wait() end
             end
-        end
+        end)
     end
 end)
 
@@ -2280,126 +2310,12 @@ local lastConfigsHash = ""
 
 refreshConfigs = function(forceRefresh)
     if not listfiles then return end
-    pcall(function()
-        local files = listfiles("")
-        local cfgNames = {}
-        local cfgDataCache = {}
-        for _, file in ipairs(files) do
-            local cfgName = file:match("PlayerCfg_(.*)%.json")
-            if cfgName then 
-                table.insert(cfgNames, cfgName) 
-                pcall(function()
-                    local decoded = HttpService:JSONDecode(readfile(file))
-                    cfgDataCache[cfgName] = decoded.__timestamp or 0
-                end)
-            end
-        end
-        
-        table.sort(cfgNames, function(a, b)
-            local aFav = favorites[a] or false
-            local bFav = favorites[b] or false
-            if aFav == bFav then 
-                return (cfgDataCache[a] or 0) > (cfgDataCache[b] or 0)
-            end
-            return aFav and not bFav
-        end)
-        
-        local currentHash = table.concat(cfgNames, "|")
-        if not forceRefresh and currentHash == lastConfigsHash then return end
-        lastConfigsHash = currentHash
-        
-        for _, child in ipairs(ConfigList:GetChildren()) do if child:IsA("Frame") then child:Destroy() end end
-        
-        for _, cfgName in ipairs(cfgNames) do
-            local isFav = favorites[cfgName] or false
-            local Item = Instance.new("Frame", ConfigList)
-            Item.Size = UDim2.new(1, -12, 0, 28)
-            Item.Position = UDim2.new(0, 6, 0, 0)
-            Item.BackgroundColor3 = Theme.PanelBG
-            Instance.new("UICorner", Item).CornerRadius = UDim.new(0, 4)
-            
-            local SelectBtn = Instance.new("TextButton", Item)
-            SelectBtn.Size = UDim2.new(1, -80, 1, 0)
-            SelectBtn.Position = UDim2.new(0, 10, 0, 0)
-            SelectBtn.ZIndex = 1
-            SelectBtn.BackgroundTransparency = 1
-            SelectBtn.Text = cfgName
-            SelectBtn.TextColor3 = Theme.TextMain
-            SelectBtn.Font = Enum.Font.GothamMedium
-            SelectBtn.TextSize = 12
-            SelectBtn.TextXAlignment = Enum.TextXAlignment.Left
-            
-            local DelBtn = Instance.new("TextButton", Item)
-            DelBtn.Size = UDim2.new(0, 22, 0, 22)
-            DelBtn.AnchorPoint = Vector2.new(1, 0.5)
-            DelBtn.Position = UDim2.new(1, -4, 0.5, 0)
-            DelBtn.ZIndex = 2
-            DelBtn.BackgroundTransparency = 1
-            DelBtn.Text = "X"
-            DelBtn.Font = Enum.Font.GothamBold
-            DelBtn.TextSize = 12
-            DelBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
-
-            local FavBtn = Instance.new("TextButton", Item)
-            FavBtn.Size = UDim2.new(0, 22, 0, 22)
-            FavBtn.AnchorPoint = Vector2.new(1, 0.5)
-            FavBtn.Position = UDim2.new(1, -28, 0.5, 0)
-            FavBtn.ZIndex = 2
-            FavBtn.BackgroundTransparency = 1
-            FavBtn.Text = "★"
-            FavBtn.Font = Enum.Font.GothamBold
-            FavBtn.TextSize = 14
-            FavBtn.TextColor3 = isFav and Color3.fromRGB(255, 215, 0) or Theme.TextSub
-            
-            local EditBtn = Instance.new("TextButton", Item)
-            EditBtn.Size = UDim2.new(0, 22, 0, 22)
-            EditBtn.AnchorPoint = Vector2.new(1, 0.5)
-            EditBtn.Position = UDim2.new(1, -52, 0.5, 0)
-            EditBtn.ZIndex = 2
-            EditBtn.BackgroundTransparency = 1
-            EditBtn.Text = "✏"
-            EditBtn.Font = Enum.Font.GothamBold
-            EditBtn.TextSize = 13
-            EditBtn.TextColor3 = Theme.TextSub
-            
-            SelectBtn.MouseButton1Click:Connect(function()
-                currentConfigName = cfgName
-                if ConfigTextBox then ConfigTextBox.Text = cfgName end
-            end)
-            
-            EditBtn.MouseButton1Click:Connect(function()
-                targetRenameCfg = cfgName
-                RInput.Text = cfgName
-                RWarning.Visible = false
-                RenameModal.Visible = true
-            end)
-            
-            FavBtn.MouseButton1Click:Connect(function()
-                favorites[cfgName] = not favorites[cfgName]
-                saveFavorites()
-                refreshConfigs(true)
-            end)
-            
-            DelBtn.MouseButton1Click:Connect(function()
-                if delfile and isfile and isfile("PlayerCfg_"..cfgName..".json") then
-                    pcall(function() delfile("PlayerCfg_"..cfgName..".json") end)
-                    favorites[cfgName] = nil
-                    saveFavorites()
-                    refreshConfigs(true)
-                end
-            end)
-        end
-    end)
-end
-createActionButton("Refresh Config List", ConfigGroup, function() refreshConfigs(true) end)
-
-task.spawn(function()
-    task.wait(0.5)
-    if listfiles and readfile then
+    task.spawn(function()
         pcall(function()
             local files = listfiles("")
             local cfgNames = {}
             local cfgDataCache = {}
+            local count = 0
             for _, file in ipairs(files) do
                 local cfgName = file:match("PlayerCfg_(.*)%.json")
                 if cfgName then 
@@ -2409,6 +2325,129 @@ task.spawn(function()
                         cfgDataCache[cfgName] = decoded.__timestamp or 0
                     end)
                 end
+                count = count + 1
+                if count % 15 == 0 then task.wait() end
+            end
+            
+            table.sort(cfgNames, function(a, b)
+                local aFav = favorites[a] or false
+                local bFav = favorites[b] or false
+                if aFav == bFav then 
+                    return (cfgDataCache[a] or 0) > (cfgDataCache[b] or 0)
+                end
+                return aFav and not bFav
+            end)
+            
+            local currentHash = table.concat(cfgNames, "|")
+            if not forceRefresh and currentHash == lastConfigsHash then return end
+            lastConfigsHash = currentHash
+            
+            for _, child in ipairs(ConfigList:GetChildren()) do if child:IsA("Frame") then child:Destroy() end end
+            
+            for _, cfgName in ipairs(cfgNames) do
+                local isFav = favorites[cfgName] or false
+                local Item = Instance.new("Frame", ConfigList)
+                Item.Size = UDim2.new(1, -12, 0, 28)
+                Item.Position = UDim2.new(0, 6, 0, 0)
+                Item.BackgroundColor3 = Theme.PanelBG
+                Instance.new("UICorner", Item).CornerRadius = UDim.new(0, 4)
+                
+                local SelectBtn = Instance.new("TextButton", Item)
+                SelectBtn.Size = UDim2.new(1, -80, 1, 0)
+                SelectBtn.Position = UDim2.new(0, 10, 0, 0)
+                SelectBtn.ZIndex = 1
+                SelectBtn.BackgroundTransparency = 1
+                SelectBtn.Text = cfgName
+                SelectBtn.TextColor3 = Theme.TextMain
+                SelectBtn.Font = Enum.Font.GothamMedium
+                SelectBtn.TextSize = 12
+                SelectBtn.TextXAlignment = Enum.TextXAlignment.Left
+                
+                local DelBtn = Instance.new("TextButton", Item)
+                DelBtn.Size = UDim2.new(0, 22, 0, 22)
+                DelBtn.AnchorPoint = Vector2.new(1, 0.5)
+                DelBtn.Position = UDim2.new(1, -4, 0.5, 0)
+                DelBtn.ZIndex = 2
+                DelBtn.BackgroundTransparency = 1
+                DelBtn.Text = "X"
+                DelBtn.Font = Enum.Font.GothamBold
+                DelBtn.TextSize = 12
+                DelBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+
+                local FavBtn = Instance.new("TextButton", Item)
+                FavBtn.Size = UDim2.new(0, 22, 0, 22)
+                FavBtn.AnchorPoint = Vector2.new(1, 0.5)
+                FavBtn.Position = UDim2.new(1, -28, 0.5, 0)
+                FavBtn.ZIndex = 2
+                FavBtn.BackgroundTransparency = 1
+                FavBtn.Text = "★"
+                FavBtn.Font = Enum.Font.GothamBold
+                FavBtn.TextSize = 14
+                FavBtn.TextColor3 = isFav and Color3.fromRGB(255, 215, 0) or Theme.TextSub
+                
+                local EditBtn = Instance.new("TextButton", Item)
+                EditBtn.Size = UDim2.new(0, 22, 0, 22)
+                EditBtn.AnchorPoint = Vector2.new(1, 0.5)
+                EditBtn.Position = UDim2.new(1, -52, 0.5, 0)
+                EditBtn.ZIndex = 2
+                EditBtn.BackgroundTransparency = 1
+                EditBtn.Text = "✏"
+                EditBtn.Font = Enum.Font.GothamBold
+                EditBtn.TextSize = 13
+                EditBtn.TextColor3 = Theme.TextSub
+                
+                SelectBtn.MouseButton1Click:Connect(function()
+                    currentConfigName = cfgName
+                    if ConfigTextBox then ConfigTextBox.Text = cfgName end
+                end)
+                
+                EditBtn.MouseButton1Click:Connect(function()
+                    targetRenameCfg = cfgName
+                    RInput.Text = cfgName
+                    RWarning.Visible = false
+                    RenameModal.Visible = true
+                end)
+                
+                FavBtn.MouseButton1Click:Connect(function()
+                    favorites[cfgName] = not favorites[cfgName]
+                    saveFavorites()
+                    refreshConfigs(true)
+                end)
+                
+                DelBtn.MouseButton1Click:Connect(function()
+                    if delfile and isfile and isfile("PlayerCfg_"..cfgName..".json") then
+                        pcall(function() delfile("PlayerCfg_"..cfgName..".json") end)
+                        favorites[cfgName] = nil
+                        saveFavorites()
+                        refreshConfigs(true)
+                    end
+                end)
+            end
+        end)
+    end)
+end
+
+createActionButton("Refresh Config List", ConfigGroup, function() refreshConfigs(true) end)
+
+task.spawn(function()
+    task.wait(0.5)
+    if listfiles and readfile then
+        pcall(function()
+            local files = listfiles("")
+            local cfgNames = {}
+            local cfgDataCache = {}
+            local count = 0
+            for _, file in ipairs(files) do
+                local cfgName = file:match("PlayerCfg_(.*)%.json")
+                if cfgName then 
+                    table.insert(cfgNames, cfgName) 
+                    pcall(function()
+                        local decoded = HttpService:JSONDecode(readfile(file))
+                        cfgDataCache[cfgName] = decoded.__timestamp or 0
+                    end)
+                end
+                count = count + 1
+                if count % 15 == 0 then task.wait() end
             end
             table.sort(cfgNames, function(a, b)
                 local aFav = favorites[a] or false
@@ -2439,7 +2478,7 @@ task.spawn(function()
     doLoadConfig()
     
     while isScriptActive do
-        task.wait(0.25)
+        task.wait(0.01)
         if isMiscPageOpen then
             pcall(function() refreshConfigs(false) end)
         end
