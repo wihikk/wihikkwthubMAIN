@@ -23,7 +23,8 @@ local settings = {
     infiniteJump = false, customWalkspeed = false, walkspeedValue = 100, freeCam = false, freeCamSpeed = 100,
     autoAirdrop = false, autoCrates = false, autoOil = false, autoBuild = false,
     noExplosions = false, antiAfk = false,
-    binds = { aimbot = nil, fly = nil, noclip = nil, clickTp = nil, customTp = nil, freeCam = nil }
+    binds = { aimbot = nil, fly = nil, noclip = nil, clickTp = nil, customTp = nil, freeCam = nil },
+    whitelist = {}
 }
 
 local uiUpdaters = {}
@@ -139,7 +140,7 @@ table.insert(scriptConnections, RunService.Heartbeat:Connect(function()
     if settings.hitboxExpander then
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid") then
-                if player.Character.Humanoid.Health > 0 and (not settings.teamCheck or player.Team ~= LocalPlayer.Team) then
+                if player.Character.Humanoid.Health > 0 and (not settings.teamCheck or player.Team ~= LocalPlayer.Team) and not settings.whitelist[player.Name] then
                     pcall(function()
                         local head = player.Character.Head
                         head.Size = Vector3.new(settings.hitboxSize, settings.hitboxSize, settings.hitboxSize)
@@ -160,6 +161,16 @@ table.insert(scriptConnections, RunService.Heartbeat:Connect(function()
                         box.Transparency = 0.7
                         box.Color3 = player.Team and player.Team.TeamColor.Color or Color3.fromRGB(255, 255, 255)
                         box.Visible = true
+                    end)
+                else
+                    pcall(function()
+                        local head = player.Character.Head
+                        if head.Size.X > 1.3 then
+                            head.Size = Vector3.new(1.2, 1.2, 1.2)
+                            head.Transparency = 0
+                            local box = head:FindFirstChild("HitboxAdornment")
+                            if box then box:Destroy() end
+                        end
                     end)
                 end
             end
@@ -455,13 +466,17 @@ local function sendBindNotification(funcName, state)
     end)
 end
 
+do
 local StatsContainer = Instance.new("Frame", StatsGui)
 StatsContainer.BackgroundTransparency = 0.15
 StatsContainer.BackgroundColor3 = Theme.PanelBG
-StatsContainer.Position = UDim2.new(0, 16, 0, 46)
+StatsContainer.Position = UDim2.new(0, -150, 0, 46)
 StatsContainer.Size = UDim2.new(0, 130, 0, 24)
 StatsContainer.ClipsDescendants = true
 Instance.new("UICorner", StatsContainer).CornerRadius = UDim.new(0, 6)
+
+TweenService:Create(StatsContainer, TweenInfo.new(0.4, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = UDim2.new(0, 16, 0, 46)}):Play()
+
 local StatsStroke = Instance.new("UIStroke", StatsContainer)
 StatsStroke.Color = Theme.Border
 StatsStroke.Thickness = 1
@@ -476,6 +491,7 @@ StatsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 local FpsContainer = Instance.new("Frame", StatsContainer)
 FpsContainer.BackgroundTransparency = 1
 FpsContainer.Size = UDim2.new(0, 50, 1, 0)
+
 local FpsLayout = Instance.new("UIListLayout", FpsContainer)
 FpsLayout.FillDirection = Enum.FillDirection.Horizontal
 FpsLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -505,6 +521,7 @@ Separator.BorderSizePixel = 0
 local PingContainer = Instance.new("Frame", StatsContainer)
 PingContainer.BackgroundTransparency = 1
 PingContainer.Size = UDim2.new(0, 55, 1, 0)
+
 local PingLayout = Instance.new("UIListLayout", PingContainer)
 PingLayout.FillDirection = Enum.FillDirection.Horizontal
 PingLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -529,7 +546,7 @@ PingValue.TextXAlignment = Enum.TextXAlignment.Left
 local lastStatsUpdate = tick()
 local framesCount = 0
 local lastFps = 0
-local lastPing = -1
+local lastPing = 0
 
 table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
     framesCount = framesCount + 1
@@ -546,11 +563,9 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                 t1.Completed:Connect(function() t2:Play() end)
             end)
         end
-        
         local ping = 0
         pcall(function() ping = math.floor(LocalPlayer:GetNetworkPing() * 1000) end)
         if ping == 0 then pcall(function() ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()) end) end
-        
         if ping ~= lastPing then
             PingValue.Text = tostring(ping)
             lastPing = ping
@@ -561,12 +576,10 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                 p1.Completed:Connect(function() p2:Play() end)
             end)
         end
-        
         framesCount = 0
         lastStatsUpdate = now
     end
 end))
-
 local VehHealthLabel = Instance.new("TextLabel", StatsGui)
 VehHealthLabel.Size = UDim2.new(0, 200, 0, 30)
 VehHealthLabel.AnchorPoint = Vector2.new(1, 1)
@@ -583,17 +596,14 @@ local VehHealthStroke = Instance.new("UIStroke", VehHealthLabel)
 VehHealthStroke.Color = Color3.new(0, 0, 0)
 VehHealthStroke.Thickness = 1.5
 VehHealthStroke.Transparency = 1
-
 local isVehHealthVisible = false
 table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChild("Humanoid")
     local seat = hum and hum.SeatPart
-    
     local inVeh = false
     local hpText = ""
     local hpColor = Color3.fromRGB(100, 255, 100)
-    
     if seat and (seat:IsA("VehicleSeat") or seat:IsA("Seat")) then
         local model = seat:FindFirstAncestorOfClass("Model")
         if model then
@@ -609,7 +619,6 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
             end
         end
     end
-    
     if inVeh and not isVehHealthVisible then
         isVehHealthVisible = true
         VehHealthLabel.Visible = true
@@ -630,12 +639,13 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
         VehHealthLabel.TextColor3 = hpColor
     end
 end))
+end
 
 local guiVisible = false
 
 local Frame = Instance.new("Frame", ScreenGui)
 Frame.Size = UDim2.new(0, 520, 0, 560)
-Frame.Position = UDim2.new(0, 90, 0, 190)
+Frame.Position = UDim2.new(0, 300, 0, 300)
 Frame.BackgroundColor3 = Theme.Background
 Frame.BackgroundTransparency = Theme.BackgroundTrans
 Frame.BorderSizePixel = 0
@@ -682,21 +692,25 @@ DTStroke.Thickness = 1
 isLoaded = true
 guiVisible = true
 
-Frame.Size = UDim2.new(0, 480, 0, 0)
-Frame.Position = UDim2.new(0, 110, 0, 210)
+Frame.Size = UDim2.new(0, 520, 0, 0)
+Frame.Position = UDim2.new(0, 300, 0, 300)
 Frame.Visible = true
 DevToolsBtn.Visible = true
 
-local menuTw = TweenService:Create(Frame, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 490, 0, 530), Position = UDim2.new(0, 90, 0, 190)})
+local menuTw = TweenService:Create(Frame, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 600)})
 table.insert(activeTweens, menuTw)
 menuTw:Play()
 
 local function ToggleMenu(forceState)
     if forceState ~= nil then guiVisible = forceState else guiVisible = not guiVisible end
+    
+    local wlWindow = ScreenGui:FindFirstChild("WhitelistMenu")
+    local isWlExpanded = wlWindow and wlWindow.Size.X.Offset > 100
+
     if guiVisible then
         Frame.Visible = true
         DevToolsBtn.Visible = true
-        
+
         local twHub = TweenService:Create(HubBtn, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 1, TextTransparency = 1})
         TweenService:Create(HubStroke, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Transparency = 1}):Play()
         twHub:Play()
@@ -708,6 +722,13 @@ local function ToggleMenu(forceState)
         local tw = TweenService:Create(Frame, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 600)})
         table.insert(activeTweens, tw)
         tw:Play()
+        
+        if isWlExpanded then
+            wlWindow.Visible = true
+            local twWl = TweenService:Create(wlWindow, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 346, 0, 373)})
+            table.insert(activeTweens, twWl)
+            twWl:Play()
+        end
     else
         HubBtn.Visible = true
         TweenService:Create(HubBtn, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 0.15, TextTransparency = 0}):Play()
@@ -725,6 +746,17 @@ local function ToggleMenu(forceState)
                 DevToolsBtn.Visible = false
             end 
         end)
+        
+        if isWlExpanded then
+            local twWl = TweenService:Create(wlWindow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Size = UDim2.new(0, 346, 0, 0)})
+            table.insert(activeTweens, twWl)
+            twWl:Play()
+            twWl.Completed:Connect(function(state)
+                if state == Enum.PlaybackState.Completed and not guiVisible then
+                    wlWindow.Visible = false
+                end
+            end)
+        end
     end
 end
 
@@ -1498,18 +1530,22 @@ createToggle("Predict", AimbotGroup, "predict")
 createSlider("Predict Strength", AimbotGroup, 1, 100, settings.predictStrength, 1, "predictStrength")
 createToggle("Shoot While Sprinting", AimbotGroup, "shootWhileSprinting")
 
-local MovementGroup = createGroup(Pages.PlayerLeft)
+local MovementGroup = createGroup(Pages.PlayerRight)
 createToggle("Noclip", MovementGroup, "noclip")
-createToggle("Fly", MovementGroup, "fly")
-createSlider("Fly Speed", MovementGroup, 5, 500, settings.flySpeed, 5, "flySpeed")
 createToggle("Infinite Jump", MovementGroup, "infiniteJump")
-createToggle("Custom Walkspeed", MovementGroup, "customWalkspeed", function(state)
+
+local FlyGroup = createGroup(Pages.PlayerLeft)
+createToggle("Fly", FlyGroup, "fly")
+createSlider("Fly Speed", FlyGroup, 5, 500, settings.flySpeed, 5, "flySpeed")
+
+local WalkspeedGroup = createGroup(Pages.PlayerLeft)
+createToggle("Custom Walkspeed", WalkspeedGroup, "customWalkspeed", function(state)
     if not state and LocalPlayer.Character then
         local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
         if hum then hum.WalkSpeed = 16 end
     end
 end)
-createSlider("Walkspeed Value", MovementGroup, 16, 500, settings.walkspeedValue, 1, "walkspeedValue")
+createSlider("Walkspeed Value", WalkspeedGroup, 16, 500, settings.walkspeedValue, 1, "walkspeedValue")
 
 local MiscCombatGroup = createGroup(Pages.CombatRight)
 createToggle("Hitbox Expander", MiscCombatGroup, "hitboxExpander", function(state)
@@ -1534,10 +1570,274 @@ createDualActionButtons("TP to Base", "TP to Capture", MiscCombatGroup,
         end 
     end
 )
-createDualActionButtons("Custom TP", "Change custom TP", MiscCombatGroup,
+createDualActionButtons("Custom TP", "Save custom TP", MiscCombatGroup,
     function() if customSpawnCFrame and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then LocalPlayer.Character.HumanoidRootPart.CFrame = customSpawnCFrame end end,
     function() if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then customSpawnCFrame = LocalPlayer.Character.HumanoidRootPart.CFrame end end
 )
+
+local WhitelistBtnGroup = createGroup(Pages.CombatRight)
+local ToggleContainer = Instance.new("Frame", WhitelistBtnGroup)
+ToggleContainer.Size = UDim2.new(1, 0, 0, 38)
+ToggleContainer.BackgroundTransparency = 1
+
+local ToggleBtn = Instance.new("TextButton", ToggleContainer)
+ToggleBtn.Size = UDim2.new(1, -24, 0, 26)
+ToggleBtn.AnchorPoint = Vector2.new(0.5, 0.5)
+ToggleBtn.Position = UDim2.new(0.5, 0, 0.5, 0)
+ToggleBtn.Text = "Aimbot Whitelist >"
+ToggleBtn.TextColor3 = Theme.TextMain
+ToggleBtn.Font = Enum.Font.GothamMedium
+ToggleBtn.TextSize = 13
+ToggleBtn.AutoButtonColor = false
+ToggleBtn.BackgroundColor3 = Theme.OffColor
+Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(0, 4)
+Instance.new("UIStroke", ToggleBtn).Color = Theme.Border
+
+local WhitelistWindow = Instance.new("Frame", ScreenGui)
+WhitelistWindow.Name = "WhitelistMenu"
+WhitelistWindow.Size = UDim2.new(0, 346, 0, 373)
+WhitelistWindow.BackgroundColor3 = Theme.Background
+WhitelistWindow.BackgroundTransparency = Theme.BackgroundTrans
+WhitelistWindow.BorderSizePixel = 0
+WhitelistWindow.ClipsDescendants = true
+WhitelistWindow.Visible = false
+Instance.new("UICorner", WhitelistWindow).CornerRadius = UDim.new(0, 10)
+local WlStroke = Instance.new("UIStroke", WhitelistWindow)
+WlStroke.Thickness = 1.5
+WlStroke.Color = Theme.Border
+
+local WlCloseBtn = Instance.new("TextButton", WhitelistWindow)
+WlCloseBtn.Size = UDim2.new(0, 20, 0, 20)
+WlCloseBtn.Position = UDim2.new(1, -25, 0, 5)
+WlCloseBtn.BackgroundTransparency = 1
+WlCloseBtn.Text = "X"
+WlCloseBtn.TextColor3 = Color3.fromRGB(130, 50, 50)
+WlCloseBtn.Font = Enum.Font.GothamBold
+WlCloseBtn.TextSize = 14
+
+local TailContainer = Instance.new("Frame", WhitelistWindow)
+TailContainer.Size = UDim2.new(0, 10, 0, 20)
+TailContainer.Position = UDim2.new(0, -10, 0.835, 0)
+TailContainer.BackgroundTransparency = 1
+TailContainer.ClipsDescendants = true
+TailContainer.ZIndex = 0
+
+local Tail = Instance.new("Frame", TailContainer)
+Tail.Size = UDim2.new(0, 14, 0, 14)
+Tail.AnchorPoint = Vector2.new(0.5, 0.5)
+Tail.Position = UDim2.new(1, 0, 0.5, 0)
+Tail.BackgroundColor3 = Theme.Background
+Tail.BackgroundTransparency = Theme.BackgroundTrans
+Tail.Rotation = 45
+Tail.BorderSizePixel = 0
+
+local ListScroll = Instance.new("ScrollingFrame", WhitelistWindow)
+ListScroll.Size = UDim2.new(1, -24, 1, -50)
+ListScroll.Position = UDim2.new(0, 12, 0, 30)
+ListScroll.BackgroundColor3 = Theme.Background
+ListScroll.BackgroundTransparency = 1
+ListScroll.BorderSizePixel = 0
+ListScroll.ScrollBarThickness = 4
+ListScroll.ScrollingEnabled = false
+
+local ListPadding = Instance.new("UIPadding", ListScroll)
+ListPadding.PaddingTop = UDim.new(0, 2)
+ListPadding.PaddingBottom = UDim.new(0, 2)
+
+local ScrollLayout = Instance.new("UIListLayout", ListScroll)
+ScrollLayout.Padding = UDim.new(0, 4)
+ScrollLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+ScrollLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    local maxPlayersNoScroll = 10
+    local itemHeight = 32
+    local contentHeight = ScrollLayout.AbsoluteContentSize.Y
+    if contentHeight > (itemHeight * maxPlayersNoScroll) then
+        ListScroll.CanvasSize = UDim2.new(0, 0, 0, contentHeight + 10)
+        ListScroll.ScrollingEnabled = true
+    else
+        ListScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+        ListScroll.ScrollingEnabled = false
+    end
+end)
+
+local wlExpanded = false
+local function toggleWlWindow()
+    wlExpanded = not wlExpanded
+    ToggleBtn.Text = wlExpanded and "Aimbot Whitelist <" or "Aimbot Whitelist >"
+    if wlExpanded then
+        WhitelistWindow.Visible = true
+        WhitelistWindow.Position = UDim2.new(0, Frame.Position.X.Offset + Frame.Size.X.Offset + 15, 0, Frame.Position.Y.Offset)
+        WhitelistWindow.Size = UDim2.new(0, 0, 0, 373)
+        local tw = TweenService:Create(WhitelistWindow, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 346, 0, 373)})
+        tw:Play()
+    else
+        local tw = TweenService:Create(WhitelistWindow, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 373)})
+        tw:Play()
+        tw.Completed:Connect(function() if not wlExpanded then WhitelistWindow.Visible = false end end)
+    end
+end
+
+ToggleBtn.MouseButton1Click:Connect(toggleWlWindow)
+WlCloseBtn.MouseButton1Click:Connect(toggleWlWindow)
+
+table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
+    if wlExpanded then
+        WhitelistWindow.Position = UDim2.new(0, Frame.Position.X.Offset + Frame.Size.X.Offset + 15, 0, Frame.Position.Y.Offset)
+    end
+end))
+
+local whitelistRows = {}
+local function updatePlayerRow(playerName)
+    pcall(function()
+        if not playerName or playerName == LocalPlayer.Name then return end
+        if type(settings.whitelist) ~= "table" then settings.whitelist = {} end
+
+        local plr = Players:FindFirstChild(playerName)
+        local isOnline = (plr ~= nil)
+        local isWl = settings.whitelist[playerName] == true
+
+        if not isOnline and not isWl then
+            local rowData = whitelistRows[playerName]
+            if rowData and rowData.Item then
+                whitelistRows[playerName] = nil
+                rowData.Item:Destroy()
+            end
+            return
+        end
+
+        if not whitelistRows[playerName] then
+            local Item = Instance.new("Frame")
+            Item.Size = UDim2.new(1, -12, 0, 28)
+            Item.Position = UDim2.new(0, 6, 0, 0)
+            Item.BackgroundTransparency = 1
+            Item.Parent = ListScroll
+
+            local Btn = Instance.new("TextButton", Item)
+            Btn.Size = UDim2.new(1, 0, 1, 0)
+            Btn.BackgroundColor3 = Theme.PanelBG
+            Btn.Text = ""
+            Btn.AutoButtonColor = false
+            Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 4)
+
+            local BtnStroke = Instance.new("UIStroke", Btn)
+            BtnStroke.Color = Theme.Accent
+            BtnStroke.Thickness = 1.5
+            BtnStroke.Transparency = 1
+            BtnStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+            local ContentContainer = Instance.new("Frame", Btn)
+            ContentContainer.Size = UDim2.new(1, -80, 1, 0)
+            ContentContainer.Position = UDim2.new(0, 8, 0, 0)
+            ContentContainer.BackgroundTransparency = 1
+            
+            local NameTeamLayout = Instance.new("UIListLayout", ContentContainer)
+            NameTeamLayout.FillDirection = Enum.FillDirection.Horizontal
+            NameTeamLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            NameTeamLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+            NameTeamLayout.Padding = UDim.new(0, 5)
+
+            local NameLbl = Instance.new("TextLabel", ContentContainer)
+            NameLbl.BackgroundTransparency = 1
+            NameLbl.Font = Enum.Font.GothamMedium
+            NameLbl.TextSize = 12
+            NameLbl.TextXAlignment = Enum.TextXAlignment.Left
+            NameLbl.AutomaticSize = Enum.AutomaticSize.X
+            
+            local TeamLbl = Instance.new("TextLabel", ContentContainer)
+            TeamLbl.BackgroundTransparency = 1
+            TeamLbl.Font = Enum.Font.Gotham
+            TeamLbl.TextSize = 11
+            TeamLbl.TextXAlignment = Enum.TextXAlignment.Left
+            TeamLbl.AutomaticSize = Enum.AutomaticSize.X
+            
+            local TeamUIStroke = Instance.new("UIStroke", TeamLbl)
+            TeamUIStroke.Color = Color3.new(255, 255, 255)
+            TeamUIStroke.Thickness = 0.2
+            TeamUIStroke.Transparency = 0.5
+
+            local StatusLbl = Instance.new("TextLabel", Btn)
+            StatusLbl.Size = UDim2.new(0, 70, 1, 0)
+            StatusLbl.AnchorPoint = Vector2.new(1, 0)
+            StatusLbl.Position = UDim2.new(1, -8, 0, 0)
+            StatusLbl.BackgroundTransparency = 1
+            StatusLbl.Font = Enum.Font.GothamMedium
+            StatusLbl.TextSize = 11
+            StatusLbl.TextXAlignment = Enum.TextXAlignment.Right
+
+            whitelistRows[playerName] = {
+                Item = Item, Btn = Btn, BtnStroke = BtnStroke, NameLbl = NameLbl, TeamLbl = TeamLbl, StatusLbl = StatusLbl
+            }
+
+            Btn.MouseButton1Click:Connect(function()
+                pcall(function()
+                    settings.whitelist[playerName] = not settings.whitelist[playerName]
+                    updatePlayerRow(playerName)
+                end)
+            end)
+        end
+
+        local els = whitelistRows[playerName]
+        if els then
+            local displayStr = tostring(playerName)
+            if string.len(displayStr) > 20 then displayStr = string.sub(displayStr, 1, 20) .. "..." end
+            els.NameLbl.Text = displayStr
+            
+            if isOnline and plr and plr.Team then
+                els.TeamLbl.Text = "[" .. plr.Team.Name .. "]"
+                local tCol = plr.Team.TeamColor.Color
+                els.TeamLbl.TextColor3 = Color3.fromRGB(math.clamp(tCol.R * 255 * 0.7, 0, 255), math.clamp(tCol.G * 255 * 0.7, 0, 255), math.clamp(tCol.B * 255 * 0.7, 0, 255))
+            else
+                els.TeamLbl.Text = "[No Team]"
+                els.TeamLbl.TextColor3 = Theme.TextSub
+            end
+
+            if isOnline then
+                els.StatusLbl.Text = "On server"
+                els.StatusLbl.TextColor3 = Color3.fromRGB(80, 160, 80)
+            else
+                els.StatusLbl.Text = "Offline"
+                els.StatusLbl.TextColor3 = Color3.fromRGB(160, 80, 80)
+            end
+
+            local strokeTargetTransparency = isWl and 0 or 1
+            TweenService:Create(els.BtnStroke, TweenInfo.new(0.2), {Transparency = strokeTargetTransparency}):Play()
+            
+            els.Btn.BackgroundColor3 = Theme.PanelBG
+            els.Btn.BackgroundTransparency = 0
+            els.NameLbl.TextColor3 = Theme.TextMain
+        end
+    end)
+end
+
+local function trackPlayer(plr)
+    pcall(function()
+        if not plr then return end
+        updatePlayerRow(plr.Name)
+        table.insert(scriptConnections, plr:GetPropertyChangedSignal("Team"):Connect(function()
+            pcall(function() updatePlayerRow(plr.Name) end)
+        end))
+    end)
+end
+
+task.spawn(function()
+    pcall(function()
+        task.wait(0.5)
+        for _, plr in ipairs(Players:GetPlayers()) do trackPlayer(plr) end
+        if type(settings.whitelist) == "table" then
+            for savedName, isSaved in pairs(settings.whitelist) do
+                if isSaved and not Players:FindFirstChild(savedName) then
+                    pcall(function() updatePlayerRow(savedName) end)
+                end
+            end
+        end
+    end)
+end)
+
+pcall(function()
+    table.insert(scriptConnections, Players.PlayerAdded:Connect(trackPlayer))
+    table.insert(scriptConnections, Players.PlayerRemoving:Connect(function(plr) pcall(function() updatePlayerRow(plr.Name) end) end))
+end)
 
 local sprintConns = {}
 local function bindSprint(char)
@@ -1594,17 +1894,6 @@ local vehicleToggle = createToggle("Vehicle ESP", EnvGroup, "vehicleEsp", functi
     end
 end)
 
-local waitLabel = Instance.new("TextLabel", vehicleToggle)
-waitLabel.Size = UDim2.new(0, 100, 1, 0)
-waitLabel.AnchorPoint = Vector2.new(1, 0.5)
-waitLabel.Position = UDim2.new(1, -62, 0.5, 0)
-waitLabel.BackgroundTransparency = 1
-waitLabel.Text = "wait ≈3 sec"
-waitLabel.TextColor3 = Theme.TextSub
-waitLabel.Font = Enum.Font.Gotham
-waitLabel.TextSize = 10
-waitLabel.TextXAlignment = Enum.TextXAlignment.Right
-
 createToggle("Submarine ESP", EnvGroup, "submarineEsp", function(v)
     if not v then
         for _, draw in pairs(subDrawings) do 
@@ -1650,21 +1939,19 @@ createToggle("Drone ESP", EnvGroup, "droneEsp", function(v)
     end
 end)
 
+do
 local AutoFarmGroup = createGroup(Pages.AutoLeft)
 createToggle("Auto Airdrop", AutoFarmGroup, "autoAirdrop")
 createToggle("Auto Crates", AutoFarmGroup, "autoCrates")
 local OilContainer = createToggle("Auto Oil", AutoFarmGroup, "autoOil")
-
 local TycoonGroup = createGroup(Pages.AutoRight)
 createToggle("Auto Build", TycoonGroup, "autoBuild")
-
 local OilModal = Instance.new("Frame", ScreenGui)
 OilModal.Size = UDim2.new(1, 0, 1, 0)
 OilModal.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 OilModal.BackgroundTransparency = 0.7
 OilModal.ZIndex = 80
 OilModal.Visible = false
-
 local OilWindow = Instance.new("Frame", OilModal)
 OilWindow.Size = UDim2.new(0, 0, 0, 0)
 OilWindow.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -1674,7 +1961,6 @@ OilWindow.ClipsDescendants = true
 OilWindow.ZIndex = 81
 Instance.new("UICorner", OilWindow).CornerRadius = UDim.new(0, 8)
 Instance.new("UIStroke", OilWindow).Color = Theme.Border
-
 local OilText = Instance.new("TextLabel", OilWindow)
 OilText.Size = UDim2.new(1, -20, 1, -50)
 OilText.Position = UDim2.new(0, 10, 0, 10)
@@ -1685,7 +1971,6 @@ OilText.TextWrapped = true
 OilText.Font = Enum.Font.GothamMedium
 OilText.TextSize = 13
 OilText.ZIndex = 82
-
 local OilIdcBtn = Instance.new("TextButton", OilWindow)
 OilIdcBtn.Size = UDim2.new(0, 100, 0, 26)
 OilIdcBtn.AnchorPoint = Vector2.new(0.5, 1)
@@ -1698,7 +1983,6 @@ OilIdcBtn.TextSize = 12
 OilIdcBtn.ZIndex = 82
 Instance.new("UICorner", OilIdcBtn).CornerRadius = UDim.new(0, 4)
 Instance.new("UIStroke", OilIdcBtn).Color = Theme.Border
-
 OilIdcBtn.MouseButton1Click:Connect(function()
     local tw = TweenService:Create(OilWindow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)})
     table.insert(activeTweens, tw)
@@ -1706,7 +1990,6 @@ OilIdcBtn.MouseButton1Click:Connect(function()
     tw.Completed:Wait()
     OilModal.Visible = false
 end)
-
 local InfoBtn = Instance.new("TextButton", OilContainer)
 InfoBtn.Size = UDim2.new(0, 20, 0, 20)
 InfoBtn.AnchorPoint = Vector2.new(1, 0.5)
@@ -1718,7 +2001,6 @@ InfoBtn.Font = Enum.Font.GothamBold
 InfoBtn.TextSize = 12
 Instance.new("UICorner", InfoBtn).CornerRadius = UDim.new(1, 0)
 Instance.new("UIStroke", InfoBtn).Color = Theme.Border
-
 InfoBtn.MouseButton1Click:Connect(function()
     OilModal.Visible = true
     OilWindow.Size = UDim2.new(0, 0, 0, 0)
@@ -1726,6 +2008,7 @@ InfoBtn.MouseButton1Click:Connect(function()
     table.insert(activeTweens, tw)
     tw:Play()
 end)
+end
 
 local BindsGroup = createGroup(Pages.BindsLeft)
 createKeybind("Aimbot Bind", BindsGroup, "aimbot")
@@ -1759,20 +2042,13 @@ local function killEffect(d)
         if settings.noExplosions then d.Enabled = false end
     end
 end
+
 _antilag_sweep = function()
-    for _, d in ipairs(workspace:GetDescendants()) do pcall(killEffect, d) end
-end
-table.insert(scriptConnections, workspace.DescendantAdded:Connect(function(d)
-    if settings.noExplosions then
-        pcall(killEffect, d)
-        if d:IsA("Explosion") then
-            d.Visible = false
-        elseif d:IsA("ParticleEmitter") or d:IsA("Fire") or d:IsA("Smoke") then
-            local exp = d:FindFirstAncestor("Explosions")
-            if exp then d.Enabled = false end
-        end
+    for _, d in ipairs(workspace:GetDescendants()) do 
+        if settings.noExplosions then pcall(killEffect, d) end 
     end
-end))
+end
+
 local gs = workspace:FindFirstChild("Game Systems")
 local expFolder = gs and gs:FindFirstChild("Explosions")
 if expFolder then
@@ -1787,7 +2063,19 @@ if expFolder then
 end
 
 createToggle("No Explosions & Particles", ClientGroup, "noExplosions", function(state)
-    if state and _antilag_sweep then _antilag_sweep() end
+    if state and _antilag_sweep then 
+        _antilag_sweep() 
+    elseif not state then
+        for _, d in ipairs(workspace:GetDescendants()) do
+            if d:IsA("ParticleEmitter") or d:IsA("Trail") or d:IsA("Beam") or d:IsA("Smoke") or d:IsA("Fire") or d:IsA("Sparkles") then
+                d.Enabled = true
+            elseif d:IsA("Explosion") then
+                d.Visible = true
+            elseif d:IsA("BasePart") and d:FindFirstAncestor("Explosions") then
+                d.Transparency = 0
+            end
+        end
+    end
 end)
 
 local ConfigGroup = createGroup(Pages.MiscRight)
@@ -1807,82 +2095,89 @@ local ConfigTextBox = createTextBox("Config Name...", ConfigGroup, function(txt)
 local targetRenameCfg = ""
 
 local RenameModal = Instance.new("Frame", Frame)
-RenameModal.Size = UDim2.new(1, 0, 1, 0)
-RenameModal.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-RenameModal.BackgroundTransparency = 0.7
-RenameModal.ZIndex = 50
-RenameModal.Visible = false
-RenameModal.Active = true
-
 local RenameWindow = Instance.new("Frame", RenameModal)
-RenameWindow.Size = UDim2.new(0, 260, 0, 130)
-RenameWindow.AnchorPoint = Vector2.new(0.5, 0.5)
-RenameWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
-RenameWindow.BackgroundColor3 = Theme.PanelBG
-RenameWindow.ZIndex = 51
-Instance.new("UICorner", RenameWindow).CornerRadius = UDim.new(0, 8)
-local RStroke = Instance.new("UIStroke", RenameWindow)
-RStroke.Color = Theme.Border
-RStroke.Thickness = 1
-
-local RTitle = Instance.new("TextLabel", RenameWindow)
-RTitle.Size = UDim2.new(1, 0, 0, 30)
-RTitle.Position = UDim2.new(0, 0, 0, 5)
-RTitle.BackgroundTransparency = 1
-RTitle.Text = "Rename Config"
-RTitle.TextColor3 = Theme.Accent
-RTitle.Font = Enum.Font.GothamBold; RTitle.TextSize = 14
-RTitle.ZIndex = 52
-
 local RInput = Instance.new("TextBox", RenameWindow)
-RInput.Size = UDim2.new(1, -30, 0, 30)
-RInput.Position = UDim2.new(0, 15, 0, 40)
-RInput.BackgroundColor3 = Theme.OffColor
-RInput.Text = ""
-RInput.TextColor3 = Theme.TextMain
-RInput.Font = Enum.Font.GothamMedium
-RInput.TextSize = 12
-RInput.ZIndex = 52
-Instance.new("UICorner", RInput).CornerRadius = UDim.new(0, 4)
-local RIStroke = Instance.new("UIStroke", RInput)
-RIStroke.Color = Theme.Border
-RIStroke.Thickness = 1
-
 local RWarning = Instance.new("TextLabel", RenameWindow)
-RWarning.Size = UDim2.new(1, 0, 0, 20)
-RWarning.Position = UDim2.new(0, 0, 0, 70)
-RWarning.BackgroundTransparency = 1
-RWarning.Text = "same names"
-RWarning.TextColor3 = Color3.fromRGB(255, 80, 80)
-RWarning.Font = Enum.Font.Gotham
-RWarning.TextSize = 11
-RWarning.ZIndex = 52
-RWarning.Visible = false
-
-local RCancelBtn = Instance.new("TextButton", RenameWindow)
-RCancelBtn.Size = UDim2.new(0.5, -20, 0, 26)
-RCancelBtn.Position = UDim2.new(0, 15, 1, -36)
-RCancelBtn.BackgroundColor3 = Theme.OffColor
-RCancelBtn.Text = "Cancel"
-RCancelBtn.TextColor3 = Theme.TextMain
-RCancelBtn.Font = Enum.Font.GothamMedium
-RCancelBtn.TextSize = 12
-RCancelBtn.ZIndex = 52
-Instance.new("UICorner", RCancelBtn).CornerRadius = UDim.new(0, 4)
-local RCStroke = Instance.new("UIStroke", RCancelBtn)
-RCStroke.Color = Theme.Border
-RCStroke.Thickness = 1
-
 local RChangeBtn = Instance.new("TextButton", RenameWindow)
-RChangeBtn.Size = UDim2.new(0.5, -20, 0, 26)
-RChangeBtn.Position = UDim2.new(0.5, 5, 1, -36)
-RChangeBtn.BackgroundColor3 = Theme.OffColor
-RChangeBtn.Text = "Change"
-RChangeBtn.TextColor3 = Theme.TextSub
-RChangeBtn.Font = Enum.Font.GothamBold
-RChangeBtn.TextSize = 12
-RChangeBtn.ZIndex = 52
-Instance.new("UICorner", RChangeBtn).CornerRadius = UDim.new(0, 4)
+
+do
+    RenameModal.Size = UDim2.new(1, 0, 1, 0)
+    RenameModal.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    RenameModal.BackgroundTransparency = 0.7
+    RenameModal.ZIndex = 50
+    RenameModal.Visible = false
+    RenameModal.Active = true
+
+    RenameWindow.Size = UDim2.new(0, 260, 0, 130)
+    RenameWindow.AnchorPoint = Vector2.new(0.5, 0.5)
+    RenameWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
+    RenameWindow.BackgroundColor3 = Theme.PanelBG
+    RenameWindow.ZIndex = 51
+    Instance.new("UICorner", RenameWindow).CornerRadius = UDim.new(0, 8)
+    local RStroke = Instance.new("UIStroke", RenameWindow)
+    RStroke.Color = Theme.Border
+    RStroke.Thickness = 1
+
+    local RTitle = Instance.new("TextLabel", RenameWindow)
+    RTitle.Size = UDim2.new(1, 0, 0, 30)
+    RTitle.Position = UDim2.new(0, 0, 0, 5)
+    RTitle.BackgroundTransparency = 1
+    RTitle.Text = "Rename Config"
+    RTitle.TextColor3 = Theme.Accent
+    RTitle.Font = Enum.Font.GothamBold; RTitle.TextSize = 14
+    RTitle.ZIndex = 52
+
+    RInput.Size = UDim2.new(1, -30, 0, 30)
+    RInput.Position = UDim2.new(0, 15, 0, 40)
+    RInput.BackgroundColor3 = Theme.OffColor
+    RInput.Text = ""
+    RInput.TextColor3 = Theme.TextMain
+    RInput.Font = Enum.Font.GothamMedium
+    RInput.TextSize = 12
+    RInput.ZIndex = 52
+    Instance.new("UICorner", RInput).CornerRadius = UDim.new(0, 4)
+    local RIStroke = Instance.new("UIStroke", RInput)
+    RIStroke.Color = Theme.Border
+    RIStroke.Thickness = 1
+
+    RWarning.Size = UDim2.new(1, 0, 0, 20)
+    RWarning.Position = UDim2.new(0, 0, 0, 70)
+    RWarning.BackgroundTransparency = 1
+    RWarning.Text = "same names"
+    RWarning.TextColor3 = Color3.fromRGB(255, 80, 80)
+    RWarning.Font = Enum.Font.Gotham
+    RWarning.TextSize = 11
+    RWarning.ZIndex = 52
+    RWarning.Visible = false
+
+    local RCancelBtn = Instance.new("TextButton", RenameWindow)
+    RCancelBtn.Size = UDim2.new(0.5, -20, 0, 26)
+    RCancelBtn.Position = UDim2.new(0, 15, 1, -36)
+    RCancelBtn.BackgroundColor3 = Theme.OffColor
+    RCancelBtn.Text = "Cancel"
+    RCancelBtn.TextColor3 = Theme.TextMain
+    RCancelBtn.Font = Enum.Font.GothamMedium
+    RCancelBtn.TextSize = 12
+    RCancelBtn.ZIndex = 52
+    Instance.new("UICorner", RCancelBtn).CornerRadius = UDim.new(0, 4)
+    local RCStroke = Instance.new("UIStroke", RCancelBtn)
+    RCStroke.Color = Theme.Border
+    RCStroke.Thickness = 1
+
+    RCancelBtn.MouseButton1Click:Connect(function()
+        RenameModal.Visible = false
+    end)
+
+    RChangeBtn.Size = UDim2.new(0.5, -20, 0, 26)
+    RChangeBtn.Position = UDim2.new(0.5, 5, 1, -36)
+    RChangeBtn.BackgroundColor3 = Theme.OffColor
+    RChangeBtn.Text = "Change"
+    RChangeBtn.TextColor3 = Theme.TextSub
+    RChangeBtn.Font = Enum.Font.GothamBold
+    RChangeBtn.TextSize = 12
+    RChangeBtn.ZIndex = 52
+    Instance.new("UICorner", RChangeBtn).CornerRadius = UDim.new(0, 4)
+end
 
 local function refreshConfigs(forceRefresh) end
 
@@ -1931,10 +2226,6 @@ RChangeBtn.MouseButton1Click:Connect(function()
     refreshConfigs(true)
 end)
 
-RCancelBtn.MouseButton1Click:Connect(function()
-    RenameModal.Visible = false
-end)
-
 local function doLoadConfig()
     if readfile and isfile then
         pcall(function()
@@ -1945,6 +2236,17 @@ local function doLoadConfig()
                         for bindK, bindV in pairs(v) do
                             settings.binds[bindK] = bindV and Enum.KeyCode[bindV] or nil
                             if uiUpdaters["bind_"..bindK] then uiUpdaters["bind_"..bindK]() end
+                        end
+                    elseif k == "whitelist" then
+                        local oldWl = settings.whitelist or {}
+                        settings.whitelist = v
+                        for name, _ in pairs(oldWl) do
+                            pcall(function() updatePlayerRow(name) end)
+                        end
+                        for name, isWl in pairs(v) do
+                            if isWl then
+                                pcall(function() updatePlayerRow(name) end)
+                            end
                         end
                     elseif k ~= "__timestamp" then
                         if uiUpdaters[k] then uiUpdaters[k](v) else settings[k] = v end
@@ -2153,98 +2455,89 @@ task.spawn(function()
     doLoadConfig()
     
     while isScriptActive do
-        task.wait(2)
+        task.wait(0.25)
         if isMiscPageOpen then
             pcall(function() refreshConfigs(false) end)
         end
     end
 end)
 
-local ServerGroup = createGroup(BottomPanel)
-local CenterContainer = Instance.new("Frame", ServerGroup)
-CenterContainer.Size = UDim2.new(1, 0, 0, 38)
-CenterContainer.BackgroundTransparency = 1
+do
+    local c = Instance.new("Frame", createGroup(BottomPanel))
+    c.Size = UDim2.new(1, 0, 0, 38)
+    c.BackgroundTransparency = 1
 
-local BtnRejoin = Instance.new("TextButton", CenterContainer)
-BtnRejoin.Size = UDim2.new(0.4, 0, 0, 26)
-BtnRejoin.AnchorPoint = Vector2.new(1, 0.5)
-BtnRejoin.Position = UDim2.new(0.5, -5, 0.5, 0)
-BtnRejoin.Text = "Rejoin"
-BtnRejoin.TextColor3 = Theme.TextMain
-BtnRejoin.Font = Enum.Font.GothamMedium
-BtnRejoin.TextSize = 12; BtnRejoin.AutoButtonColor = false
-BtnRejoin.BackgroundColor3 = Theme.OffColor
-Instance.new("UICorner", BtnRejoin).CornerRadius = UDim.new(0, 4)
-local StrokeRejoin = Instance.new("UIStroke", BtnRejoin)
-StrokeRejoin.Color = Theme.Border
-StrokeRejoin.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    local function mkBtn(txt, xAnch, xPos, w)
+        local btn = Instance.new("TextButton", c)
+        btn.Size = UDim2.new(w, 0, 0, 26)
+        btn.AnchorPoint = Vector2.new(xAnch, 0.5)
+        btn.Position = UDim2.new(0.5, xPos, 0.5, 0)
+        btn.Text = txt
+        btn.TextColor3 = Theme.TextMain
+        btn.Font = Enum.Font.GothamMedium
+        btn.TextSize = 12
+        btn.AutoButtonColor = false
+        btn.BackgroundColor3 = Theme.OffColor
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+        local s = Instance.new("UIStroke", btn)
+        s.Color = Theme.Border
+        s.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+        return btn
+    end
 
-BtnRejoin.MouseButton1Click:Connect(function()
-    TweenService:Create(BtnRejoin, TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.fromRGB(0,0,0)}):Play()
-    task.delay(0.1, function() TweenService:Create(BtnRejoin, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.OffColor, TextColor3 = Theme.TextMain}):Play() end)
-    if #Players:GetPlayers() <= 1 then TeleportService:Teleport(game.PlaceId, LocalPlayer) else TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer) end
-end)
-
-local BtnHop = Instance.new("TextButton", CenterContainer)
-BtnHop.Size = UDim2.new(0.4, 0, 0, 26)
-BtnHop.AnchorPoint = Vector2.new(0, 0.5)
-BtnHop.Position = UDim2.new(0.5, 5, 0.5, 0)
-BtnHop.Text = "Server Hop"
-BtnHop.TextColor3 = Theme.TextMain
-BtnHop.Font = Enum.Font.GothamMedium
-BtnHop.TextSize = 12; BtnHop.AutoButtonColor = false
-BtnHop.BackgroundColor3 = Theme.OffColor
-Instance.new("UICorner", BtnHop).CornerRadius = UDim.new(0, 4)
-local StrokeHop = Instance.new("UIStroke", BtnHop)
-StrokeHop.Color = Theme.Border
-StrokeHop.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
-BtnHop.MouseButton1Click:Connect(function()
-    TweenService:Create(BtnHop, TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.fromRGB(0,0,0)}):Play()
-    task.delay(0.1, function() TweenService:Create(BtnHop, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.OffColor, TextColor3 = Theme.TextMain}):Play() end)
-    pcall(function()
-        local response = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")
-        if response then
-            local data = HttpService:JSONDecode(response)
-            local validServers = {}
-            if data and data.data then
-                for _, server in ipairs(data.data) do if server.playing < server.maxPlayers and server.id ~= game.JobId then table.insert(validServers, server.id) end end
-            end
-            if #validServers > 0 then TeleportService:TeleportToPlaceInstance(game.PlaceId, validServers[math.random(1, #validServers)], LocalPlayer) return end
-        end
+    local b1 = mkBtn("Rejoin", 1, -5, 0.4)
+    b1.MouseButton1Click:Connect(function()
+        TweenService:Create(b1, TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.fromRGB(0,0,0)}):Play()
+        task.delay(0.1, function() TweenService:Create(b1, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.OffColor, TextColor3 = Theme.TextMain}):Play() end)
+        if #Players:GetPlayers() <= 1 then TeleportService:Teleport(game.PlaceId, LocalPlayer) else TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer) end
     end)
-    TeleportService:Teleport(game.PlaceId, LocalPlayer)
-end)
 
-local BtnHide = Instance.new("TextButton", Frame)
-BtnHide.Size = UDim2.new(0, 95, 0, 20)
-BtnHide.AnchorPoint = Vector2.new(0, 0)
-BtnHide.Position = UDim2.new(0, 20, 1, -35)
-BtnHide.BackgroundColor3 = Theme.OffColor
-BtnHide.Text = "Hide Menu"
-BtnHide.TextColor3 = Theme.TextMain
-BtnHide.Font = Enum.Font.GothamMedium
-BtnHide.TextSize = 10
-BtnHide.AutoButtonColor = false
-Instance.new("UICorner", BtnHide).CornerRadius = UDim.new(0, 4)
-local StrokeHide = Instance.new("UIStroke", BtnHide)
-StrokeHide.Color = Theme.Border
-StrokeHide.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    local b2 = mkBtn("Server Hop", 0, 5, 0.4)
+    b2.MouseButton1Click:Connect(function()
+        TweenService:Create(b2, TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.Accent, TextColor3 = Color3.fromRGB(0,0,0)}):Play()
+        task.delay(0.1, function() TweenService:Create(b2, TweenInfo.new(0.15, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundColor3 = Theme.OffColor, TextColor3 = Theme.TextMain}):Play() end)
+        pcall(function()
+            local response = game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Desc&limit=100")
+            if response then
+                local data = HttpService:JSONDecode(response)
+                local validServers = {}
+                if data and data.data then
+                    for _, server in ipairs(data.data) do if server.playing < server.maxPlayers and server.id ~= game.JobId then table.insert(validServers, server.id) end end
+                end
+                if #validServers > 0 then TeleportService:TeleportToPlaceInstance(game.PlaceId, validServers[math.random(1, #validServers)], LocalPlayer) return end
+            end
+        end)
+        TeleportService:Teleport(game.PlaceId, LocalPlayer)
+    end)
 
-BtnHide.MouseButton1Click:Connect(function()
-    ToggleMenu(false)
-end)
+    local b3 = Instance.new("TextButton", Frame)
+    b3.Size = UDim2.new(0, 95, 0, 20)
+    b3.AnchorPoint = Vector2.new(0, 0)
+    b3.Position = UDim2.new(0, 20, 1, -35)
+    b3.BackgroundColor3 = Theme.OffColor
+    b3.Text = "Hide Menu"
+    b3.TextColor3 = Theme.TextMain
+    b3.Font = Enum.Font.GothamMedium
+    b3.TextSize = 10
+    b3.AutoButtonColor = false
+    Instance.new("UICorner", b3).CornerRadius = UDim.new(0, 4)
+    local s3 = Instance.new("UIStroke", b3)
+    s3.Color = Theme.Border
+    s3.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-local Footer = Instance.new("TextLabel", Frame)
-Footer.Size = UDim2.new(0, 200, 0, 20)
-Footer.AnchorPoint = Vector2.new(1, 0)
-Footer.Position = UDim2.new(1, -20, 1, -35)
-Footer.BackgroundTransparency = 1
-Footer.Text = "[K] - Hide Menu  •  [Delete] - Unload Script"
-Footer.TextColor3 = Theme.TextSub
-Footer.Font = Enum.Font.GothamMedium
-Footer.TextSize = 11
-Footer.TextXAlignment = Enum.TextXAlignment.Right
+    b3.MouseButton1Click:Connect(function() ToggleMenu(false) end)
+
+    local f = Instance.new("TextLabel", Frame)
+    f.Size = UDim2.new(0, 200, 0, 20)
+    f.AnchorPoint = Vector2.new(1, 0)
+    f.Position = UDim2.new(1, -20, 1, -35)
+    f.BackgroundTransparency = 1
+    f.Text = "[K] - Hide Menu    [Delete] - Unload Script"
+    f.TextColor3 = Theme.TextSub
+    f.Font = Enum.Font.GothamMedium
+    f.TextSize = 11
+    f.TextXAlignment = Enum.TextXAlignment.Right
+end
 
 local function UnloadScript()
     isScriptActive = false 
@@ -2471,10 +2764,19 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
     local mouseLoc = UserInputService:GetMouseLocation()
     local trackDist = settings.aimbot and settings.fov or 150
     local closestForDamage = nil
-    
+
+    local targetLocked = false
+    local mouseLoc = UserInputService:GetMouseLocation()
+    local trackDist = settings.aimbot and settings.fov or 150
+    local closestForDamage = nil
+
     if settings.aimbot then
+        FOVring.Visible = true
+        FOVring.Radius = settings.fov
+        FOVring.Position = mouseLoc
+        
         for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            if not settings.whitelist[player.Name] and player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
                 if not settings.teamCheck or player.Team ~= LocalPlayer.Team then
                     local pos, onScreen = Camera:WorldToViewportPoint(player.Character.Head.Position)
                     if onScreen and pos.Z > 0 then
@@ -2493,10 +2795,27 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
 
         if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) and activeTarget then
             targetLocked = true 
+            FOVring.Color = Color3.fromRGB(255, 50, 50)
             local aimPos = activeTarget.Character.Head.Position
             if settings.predict and activeTarget.Character:FindFirstChild("HumanoidRootPart") then
                 aimPos = aimPos + (activeTarget.Character.HumanoidRootPart.AssemblyLinearVelocity * (settings.predictStrength / 100))
             end
+            local targetCFrame = CFrame.new(Camera.CFrame.Position, aimPos)
+            Camera.CFrame = settings.smoothness > 0 and Camera.CFrame:Lerp(targetCFrame, math.clamp((100 - settings.smoothness) / 100, 0.02, 1)) or targetCFrame
+        else
+            FOVring.Color = Color3.fromRGB(255, 255, 255)
+        end
+    else
+        FOVring.Visible = false
+        activeTarget = nil
+    end
+
+        if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) and activeTarget then
+            targetLocked = true 
+            local aimPos = activeTarget.Character.Head.Position
+            if settings.predict and activeTarget.Character:FindFirstChild("HumanoidRootPart") then
+                aimPos = aimPos + (activeTarget.Character.HumanoidRootPart.AssemblyLinearVelocity * (settings.predictStrength / 100))
+            else
             local targetCFrame = CFrame.new(Camera.CFrame.Position, aimPos)
             Camera.CFrame = settings.smoothness > 0 and Camera.CFrame:Lerp(targetCFrame, math.clamp((100 - settings.smoothness) / 100, 0.02, 1)) or targetCFrame
         end
@@ -2641,13 +2960,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
     local nowTime = tick()
     if nowTime - lastFrameTime >= frameDelay then
         lastFrameTime = nowTime
-        
-        pcall(function()
-            FOVring.Position = UserInputService:GetMouseLocation()
-            FOVring.Radius = settings.fov
-            FOVring.Visible = settings.aimbot
-            FOVring.Color = targetLocked and Color3.fromRGB(235, 94, 85) or Color3.fromRGB(255, 255, 255)
-        end)
+
 
         if settings.vehicleEsp then
             for i, seat in ipairs(vehicles) do
