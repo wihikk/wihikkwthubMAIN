@@ -367,7 +367,7 @@ task.spawn(function()
                 end
                 
                 local foundSpecific = false
-                local workspaces = {"Tank Workspace", "Plane Workspace", "Submarine Workspace", "Helicopter Workspace", "Boat Workspace", "Vehicles Workspace"}
+                local workspaces = {"Tank Workspace", "Plane Workspace", "Helicopter Workspace", "Boat Workspace", "Vehicle Workspace"}
                 
                 for _, name in ipairs(workspaces) do
                     local folder = gs:FindFirstChild(name) or gs:FindFirstChild(string.lower(name))
@@ -2071,27 +2071,6 @@ if expFolder then
     end))
 end
 
-createToggle("No Explosions & Particles", ClientGroup, "noExplosions", function(state)
-    if state and _antilag_sweep then 
-        _antilag_sweep() 
-    elseif not state then
-        task.spawn(function()
-            local count = 0
-            for _, d in ipairs(workspace:GetDescendants()) do
-                if d:IsA("ParticleEmitter") or d:IsA("Trail") or d:IsA("Beam") or d:IsA("Smoke") or d:IsA("Fire") or d:IsA("Sparkles") then
-                    d.Enabled = true
-                elseif d:IsA("Explosion") then
-                    d.Visible = true
-                elseif d:IsA("BasePart") and d:FindFirstAncestor("Explosions") then
-                    d.Transparency = 0
-                end
-                count = count + 1
-                if count % 1000 == 0 then task.wait() end
-            end
-        end)
-    end
-end)
-
 local ConfigGroup = createGroup(Pages.MiscRight)
 local currentConfigName = "default"
 
@@ -2300,6 +2279,10 @@ ConfigList.BorderSizePixel = 0
 ConfigList.ScrollBarThickness = 4
 Instance.new("UICorner", ConfigList).CornerRadius = UDim.new(0, 4)
 
+local ConfigListPadding = Instance.new("UIPadding", ConfigList)
+ConfigListPadding.PaddingTop = UDim.new(0, 4)
+ConfigListPadding.PaddingBottom = UDim.new(0, 4)
+
 local CListLayout = Instance.new("UIListLayout", ConfigList)
 CListLayout.Padding = UDim.new(0, 4)
 CListLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -2344,13 +2327,19 @@ refreshConfigs = function(forceRefresh)
             
             for _, child in ipairs(ConfigList:GetChildren()) do if child:IsA("Frame") then child:Destroy() end end
             
-            for _, cfgName in ipairs(cfgNames) do
+                        for _, cfgName in ipairs(cfgNames) do
                 local isFav = favorites[cfgName] or false
                 local Item = Instance.new("Frame", ConfigList)
                 Item.Size = UDim2.new(1, -12, 0, 28)
                 Item.Position = UDim2.new(0, 6, 0, 0)
                 Item.BackgroundColor3 = Theme.PanelBG
                 Instance.new("UICorner", Item).CornerRadius = UDim.new(0, 4)
+                
+                local ItemStroke = Instance.new("UIStroke", Item)
+                ItemStroke.Color = Theme.Accent
+                ItemStroke.Thickness = 1.5
+                ItemStroke.Transparency = (cfgName == currentConfigName) and 0 or 1
+                ItemStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                 
                 local SelectBtn = Instance.new("TextButton", Item)
                 SelectBtn.Size = UDim2.new(1, -80, 1, 0)
@@ -2399,30 +2388,9 @@ refreshConfigs = function(forceRefresh)
                 SelectBtn.MouseButton1Click:Connect(function()
                     currentConfigName = cfgName
                     if ConfigTextBox then ConfigTextBox.Text = cfgName end
-                end)
-                
-                EditBtn.MouseButton1Click:Connect(function()
-                    targetRenameCfg = cfgName
-                    RInput.Text = cfgName
-                    RWarning.Visible = false
-                    RenameModal.Visible = true
-                end)
-                
-                FavBtn.MouseButton1Click:Connect(function()
-                    favorites[cfgName] = not favorites[cfgName]
-                    saveFavorites()
                     refreshConfigs(true)
                 end)
-                
-                DelBtn.MouseButton1Click:Connect(function()
-                    if delfile and isfile and isfile("PlayerCfg_"..cfgName..".json") then
-                        pcall(function() delfile("PlayerCfg_"..cfgName..".json") end)
-                        favorites[cfgName] = nil
-                        saveFavorites()
-                        refreshConfigs(true)
-                    end
-                end)
-            end
+            end    
         end)
     end)
 end
@@ -2704,16 +2672,34 @@ table.insert(scriptConnections, RunService.Stepped:Connect(function()
     local doingFly = settings.fly and not (hum and hum.SeatPart)
 
     if hrp then
-        if doingFly then
-            wasFlying = true
-            if hum then
-                hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-                hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
+            if doingFly then
+            if not wasFlying then
+                wasFlying = true
+                if not settings.noFallDmg and uiUpdaters.noFallDmg then
+                    uiUpdaters.noFallDmg(true)
+                end
+                if char:FindFirstChild("Animate") then
+                    char.Animate.Disabled = true
+                end
+                if hum then
+                    for _, track in ipairs(hum:GetPlayingAnimationTracks()) do
+                        track:Stop()
+                    end
+                end
             end
+            
+            if hum then
+                hum.PlatformStand = true
+            end
+
             local bv = hrp:FindFirstChild("FlyBV") or Instance.new("BodyVelocity", hrp)
-            bv.Name = "FlyBV"; bv.MaxForce = Vector3.new(100000, 100000, 100000)
+            bv.Name = "FlyBV"
+            bv.MaxForce = Vector3.new(100000, 100000, 100000)
+            
             local bg = hrp:FindFirstChild("FlyBG") or Instance.new("BodyGyro", hrp)
-            bg.Name = "FlyBG"; bg.MaxTorque = Vector3.new(100000, 100000, 100000); bg.P = 10000
+            bg.Name = "FlyBG"
+            bg.MaxTorque = Vector3.new(100000, 100000, 100000)
+            bg.P = 10000
             
             local moveDir = Vector3.new()
             if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + Camera.CFrame.LookVector end
@@ -2722,13 +2708,16 @@ table.insert(scriptConnections, RunService.Stepped:Connect(function()
             if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + Camera.CFrame.RightVector end
             if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0, 1, 0) end
             if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir = moveDir - Vector3.new(0, 1, 0) end
+            
             bv.Velocity = moveDir.Magnitude > 0 and moveDir.Unit * settings.flySpeed or Vector3.new(0, 0, 0)
             bg.CFrame = Camera.CFrame
         elseif wasFlying then
             wasFlying = false
             if hum then
-                hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
-                hum:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+                hum.PlatformStand = false
+            end
+            if char:FindFirstChild("Animate") then
+                char.Animate.Disabled = false
             end
             if hrp:FindFirstChild("FlyBV") then hrp.FlyBV:Destroy() end
             if hrp:FindFirstChild("FlyBG") then hrp.FlyBG:Destroy() end
@@ -3133,7 +3122,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                 sysCache.uavs = pw and pw:GetChildren() or {}
                 local tw = gs:FindFirstChild("Tank Workspace")
                 sysCache.ugvs = tw and tw:GetChildren() or {}
-                local dw = gs:FindFirstChild("Drone Workspace") or gs:FindFirstChild("drone workspace")
+                local dw = gs:FindFirstChild("Drone Workspace")
                 sysCache.drones = dw and dw:GetChildren() or {}
             else
                 sysCache.subs = {}
