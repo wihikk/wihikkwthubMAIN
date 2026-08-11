@@ -1437,7 +1437,7 @@ end
 
 local function createSubGrid(parent)
     local Wrapper = Instance.new("Frame", parent)
-    Wrapper.Size = UDim2.new(1, 0, 0, 88)
+    Wrapper.Size = UDim2.new(1, 0, 0, 116)
     Wrapper.BackgroundTransparency = 1
     local Padding = Instance.new("UIPadding", Wrapper)
     Padding.PaddingLeft = UDim.new(0, 10)
@@ -1869,8 +1869,22 @@ end)
 
 pcall(function()
     table.insert(scriptConnections, Players.PlayerAdded:Connect(trackPlayer))
-    table.insert(scriptConnections, Players.PlayerRemoving:Connect(function(plr) pcall(function() updatePlayerRow(plr.Name) end) end))
-    chams.Adornee = nil
+    table.insert(scriptConnections, Players.PlayerRemoving:Connect(function(plr)
+        pcall(function() updatePlayerRow(plr.Name) end)
+        if espObjects[plr] then
+            safeRemoveDrawing(espObjects[plr].box)
+            safeRemoveDrawing(espObjects[plr].health)
+            safeRemoveDrawing(espObjects[plr].team)
+            safeRemoveDrawing(espObjects[plr].name)
+            safeRemoveDrawing(espObjects[plr].dist)
+            if espObjects[plr].chams then pcall(function() espObjects[plr].chams:Destroy() end) end
+            espObjects[plr] = nil
+        end
+        if tracerObjects[plr] then
+            safeRemoveDrawing(tracerObjects[plr])
+            tracerObjects[plr] = nil
+        end
+    end))
 end)
 
 local sprintConns = {}
@@ -1905,13 +1919,13 @@ local EspGroup = createGroup(Pages.VisualsLeft)
 createToggle("Player ESP", EspGroup, "esp")
 local EspGrid = createSubGrid(EspGroup)
 createSubButton("Boxes", EspGrid, "espBoxes")
+createSubButton("Chams", EspGrid, "chams")
+createSubButton("Tracers", EspGrid, "tracers")
 createSubButton("Health", EspGrid, "espHealth")
 createSubButton("Distance", EspGrid, "espDist")
 createSubButton("Names", EspGrid, "espNames")
 createSubButton("Teams", EspGrid, "espTeams")
 createSubButton("Teams White", EspGrid, "espTeamsWhite")
-createToggle("Tracers", EspGroup, "tracers")
-createToggle("Chams", EspGroup, "chams")
 
 local EnvGroup = createGroup(Pages.VisualsRight)
 local vehicleToggle = createToggle("Vehicle ESP", EnvGroup, "vehicleEsp", function(v)
@@ -2036,6 +2050,7 @@ InfoBtn.TextSize = 12
 Instance.new("UICorner", InfoBtn).CornerRadius = UDim.new(1, 0)
 Instance.new("UIStroke", InfoBtn).Color = Theme.Border
 InfoBtn.MouseButton1Click:Connect(function()
+    if OilModal.Visible then return end
     OilModal.Visible = true
     OilWindow.Size = UDim2.new(0, 0, 0, 0)
     local tw = TweenService:Create(OilWindow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 260, 0, 140)})
@@ -2054,8 +2069,72 @@ createKeybind("Free Cam Bind", BindsGroup, "freeCam")
 
 local ClientGroup = createGroup(Pages.MiscLeft)
 createToggle("Anti AFK", ClientGroup, "antiAfk")
-createToggle("Free Cam", ClientGroup, "freeCam")
+local FreeCamContainer = createToggle("Free Cam", ClientGroup, "freeCam")
 createSlider("Free Cam Speed", ClientGroup, 5, 1000, settings.freeCamSpeed, 5, "freeCamSpeed")
+
+local FCModal = Instance.new("Frame", ScreenGui)
+FCModal.Size = UDim2.new(1, 0, 1, 0)
+FCModal.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+FCModal.BackgroundTransparency = 0.7
+FCModal.ZIndex = 80
+FCModal.Visible = false
+local FCWindow = Instance.new("Frame", FCModal)
+FCWindow.Size = UDim2.new(0, 0, 0, 0)
+FCWindow.AnchorPoint = Vector2.new(0.5, 0.5)
+FCWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
+FCWindow.BackgroundColor3 = Theme.PanelBG
+FCWindow.ClipsDescendants = true
+FCWindow.ZIndex = 81
+Instance.new("UICorner", FCWindow).CornerRadius = UDim.new(0, 8)
+Instance.new("UIStroke", FCWindow).Color = Theme.Border
+local FCText = Instance.new("TextLabel", FCWindow)
+FCText.Size = UDim2.new(1, -20, 1, -50)
+FCText.Position = UDim2.new(0, 10, 0, 10)
+FCText.BackgroundTransparency = 1
+FCText.Text = "u can boost ur speed by pressing left shift btw"
+FCText.TextColor3 = Theme.Accent
+FCText.TextWrapped = true
+FCText.Font = Enum.Font.GothamMedium
+FCText.TextSize = 13
+FCText.ZIndex = 82
+local FCIdcBtn = Instance.new("TextButton", FCWindow)
+FCIdcBtn.Size = UDim2.new(0, 100, 0, 26)
+FCIdcBtn.AnchorPoint = Vector2.new(0.5, 1)
+FCIdcBtn.Position = UDim2.new(0.5, 0, 1, -10)
+FCIdcBtn.BackgroundColor3 = Theme.OffColor
+FCIdcBtn.Text = "Close"
+FCIdcBtn.TextColor3 = Theme.TextMain
+FCIdcBtn.Font = Enum.Font.GothamMedium
+FCIdcBtn.TextSize = 12
+FCIdcBtn.ZIndex = 82
+Instance.new("UICorner", FCIdcBtn).CornerRadius = UDim.new(0, 4)
+Instance.new("UIStroke", FCIdcBtn).Color = Theme.Border
+FCIdcBtn.MouseButton1Click:Connect(function()
+    local tw = TweenService:Create(FCWindow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)})
+    table.insert(activeTweens, tw)
+    tw:Play()
+    tw.Completed:Wait()
+    FCModal.Visible = false
+end)
+local FCInfoBtn = Instance.new("TextButton", FreeCamContainer)
+FCInfoBtn.Size = UDim2.new(0, 20, 0, 20)
+FCInfoBtn.AnchorPoint = Vector2.new(1, 0.5)
+FCInfoBtn.Position = UDim2.new(1, -64, 0.5, 0)
+FCInfoBtn.BackgroundColor3 = Theme.OffColor
+FCInfoBtn.Text = "i"
+FCInfoBtn.TextColor3 = Theme.Accent
+FCInfoBtn.Font = Enum.Font.GothamBold
+FCInfoBtn.TextSize = 12
+Instance.new("UICorner", FCInfoBtn).CornerRadius = UDim.new(1, 0)
+Instance.new("UIStroke", FCInfoBtn).Color = Theme.Border
+FCInfoBtn.MouseButton1Click:Connect(function()
+    if FCModal.Visible then return end
+    FCModal.Visible = true
+    FCWindow.Size = UDim2.new(0, 0, 0, 0)
+    local tw = TweenService:Create(FCWindow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 260, 0, 100)})
+    table.insert(activeTweens, tw)
+    tw:Play()
+end)
 
 task.spawn(function()
     while isScriptActive do
@@ -2893,7 +2972,7 @@ table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
                 espObjects[player].chams.FillTransparency = 0.5
                 espObjects[player].chams.OutlineTransparency = 0
                 pcall(function() espObjects[player].chams.Parent = game:GetService("CoreGui") end)
-                tracerObjects[player] = createDrawing("Line", {Thickness = 1.5, Visible = false})
+                tracerObjects[player] = createDrawing("Line", {Thickness = 1, Visible = false})
             end
 
             local esp = espObjects[player]
@@ -3746,21 +3825,21 @@ task.spawn(function()
                     t = t and LocalPlayer.Team and t:FindFirstChild(LocalPlayer.Team.Name)
                     local oil = t and t:FindFirstChild("Essentials") and t.Essentials:FindFirstChild("Oil Collector")
                     local part = oil and oil:FindFirstChild("Persistant") and oil.Persistant:FindFirstChild("CratePromptPart")
-                    local prompt = part and part:FindFirstChildWhichIsA("ProximityPrompt", true)
                     
-                    if prompt and part and oil then
+                    if part then
                         hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
                         hrp.Velocity = Vector3.new(0,0,0)
                         
-                        if not firstCrateTurnIn then
+                        if firstCrateTurnIn then
+                            task.wait(0.2)
+                            firstCrateTurnIn = false
+                        else
                             task.wait(1.5)
                         end
-                        
+
                         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
                         task.wait(3.2)
                         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-                        
-                        firstCrateTurnIn = false
                     end
                 else
                     local col = workspace:FindFirstChild("Game Systems") and workspace["Game Systems"]:FindFirstChild("Collectibles Workspace")
@@ -3872,21 +3951,21 @@ task.spawn(function()
                     t = t and LocalPlayer.Team and t:FindFirstChild(LocalPlayer.Team.Name)
                     local oil = t and t:FindFirstChild("Essentials") and t.Essentials:FindFirstChild("Oil Collector")
                     local part = oil and oil:FindFirstChild("Persistant") and oil.Persistant:FindFirstChild("CratePromptPart")
-                    local prompt = part and part:FindFirstChildWhichIsA("ProximityPrompt", true)
                     
-                    if prompt and part and oil then
-                        hrp.CFrame = part.CFrame + Vector3.new(0, 6, 0)
+                    if part then
+                        hrp.CFrame = part.CFrame + Vector3.new(0, 3, 0)
                         hrp.Velocity = Vector3.new(0,0,0)
                         
-                        if not firstOilTurnIn then
+                        if firstOilTurnIn then
+                            task.wait(0.2)
+                            firstOilTurnIn = false
+                        else
                             task.wait(1.5)
                         end
-                        
+
                         VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
                         task.wait(3.2)
                         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-                        
-                        firstOilTurnIn = false
                     end
                 else
                     local col = workspace:FindFirstChild("Game Systems") and workspace["Game Systems"]:FindFirstChild("Collectibles Workspace")
