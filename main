@@ -1,3 +1,19 @@
+local abortExecution = false
+local executeUnload = function() abortExecution = true end
+
+local previousUnloader = _G.WihikkScriptUnload
+_G.WihikkScriptUnload = function() pcall(executeUnload) end
+
+if type(previousUnloader) == "function" then
+    pcall(previousUnloader)
+elseif type(previousUnloader) == "table" then
+    for _, fn in ipairs(previousUnloader) do pcall(fn) end
+end
+
+task.wait(0.2)
+if abortExecution then return 
+end
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -24,7 +40,8 @@ local settings = {
     autoAirdrop = false, autoCrates = false, autoOil = false, autoBuild = false,
     noExplosions = false, antiAfk = false,
     binds = { aimbot = nil, fly = nil, noclip = nil, clickTp = nil, customTp = nil, freeCam = nil },
-    whitelist = {}
+    whitelist = {},
+    crateWhitelist = {}
 }
 
 local uiUpdaters = {}
@@ -32,6 +49,13 @@ local scriptConnections = {}
 local activeTweens = {}
 local isScriptActive = true
 local isLoaded = false
+
+local baseUnload = executeUnload
+executeUnload = function()
+    isScriptActive = false
+    pcall(baseUnload)
+end
+
 local baseSpawnCFrame = nil
 local customSpawnCFrame = nil
 local wasNoclip = false
@@ -395,6 +419,8 @@ pcall(function() targetParent = gethui and gethui() end)
 if not targetParent then pcall(function() targetParent = game:GetService("CoreGui") end) end
 if not targetParent then targetParent = LocalPlayer:WaitForChild("PlayerGui") end
 
+if not isScriptActive then return end
+
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "CustomOverlayMenu"
 ScreenGui.ResetOnSpawn = false
@@ -700,7 +726,7 @@ Frame.Position = UDim2.new(0, 300, 0, 300)
 Frame.Visible = true
 DevToolsBtn.Visible = true
 
-local menuTw = TweenService:Create(Frame, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 600)})
+local menuTw = TweenService:Create(Frame, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 520, 0, 540)})
 table.insert(activeTweens, menuTw)
 menuTw:Play()
 
@@ -709,6 +735,9 @@ local function ToggleMenu(forceState)
     
     local wlWindow = ScreenGui:FindFirstChild("WhitelistMenu")
     local isWlExpanded = wlWindow and wlWindow.Size.X.Offset > 100
+
+    local cWlWindow = ScreenGui:FindFirstChild("CrateWhitelistMenu")
+    local isCWlExpanded = cWlWindow and cWlWindow.Size.X.Offset > 100
 
     if guiVisible then
         Frame.Visible = true
@@ -726,11 +755,18 @@ local function ToggleMenu(forceState)
         table.insert(activeTweens, tw)
         tw:Play()
         
-        if isWlExpanded then
+        if isWlExpanded and wlWindow then
             wlWindow.Visible = true
             local twWl = TweenService:Create(wlWindow, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 346, 0, 373)})
             table.insert(activeTweens, twWl)
             twWl:Play()
+        end
+
+        if isCWlExpanded and cWlWindow then
+            cWlWindow.Visible = true
+            local twCWl = TweenService:Create(cWlWindow, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 346, 0, 373)})
+            table.insert(activeTweens, twCWl)
+            twCWl:Play()
         end
     else
         HubBtn.Visible = true
@@ -750,13 +786,24 @@ local function ToggleMenu(forceState)
             end 
         end)
         
-        if isWlExpanded then
+        if isWlExpanded and wlWindow then
             local twWl = TweenService:Create(wlWindow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Size = UDim2.new(0, 346, 0, 0)})
             table.insert(activeTweens, twWl)
             twWl:Play()
             twWl.Completed:Connect(function(state)
                 if state == Enum.PlaybackState.Completed and not guiVisible then
                     wlWindow.Visible = false
+                end
+            end)
+        end
+
+        if isCWlExpanded and cWlWindow then
+            local twCWl = TweenService:Create(cWlWindow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Size = UDim2.new(0, 346, 0, 0)})
+            table.insert(activeTweens, twCWl)
+            twCWl:Play()
+            twCWl.Completed:Connect(function(state)
+                if state == Enum.PlaybackState.Completed and not guiVisible then
+                    cWlWindow.Visible = false
                 end
             end)
         end
@@ -897,8 +944,8 @@ BtnTeamVeh.MouseButton1Click:Connect(function()
 end)
 
 local BtnMoondex = Instance.new("TextButton", DevPanel)
-BtnMoondex.Size = UDim2.new(0.5, -15, 0, 30)
-BtnMoondex.Position = UDim2.new(0.5, 5, 0, 85)
+BtnMoondex.Size = UDim2.new(0.5, 80, 0, 30)
+BtnMoondex.Position = UDim2.new(0.125, 5, 0, 85)
 BtnMoondex.BackgroundColor3 = Theme.OffColor
 BtnMoondex.Text = "Moondex"
 BtnMoondex.TextColor3 = Theme.TextMain
@@ -1173,19 +1220,19 @@ local function createTabButton(name, pageObject, isDefault)
         end
         TweenService:Create(Btn, TweenInfo.new(0.2, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {TextColor3 = Theme.Accent}):Play()
         
-        TweenService:Create(ActiveIndicator, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
+        TweenService:Create(ActiveIndicator, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {
             Position = UDim2.new(0, idx * (65 + 12), 0, 0)
         }):Play()
         
         local oldPage = activePage
         activePage = pageObject
         if oldPage then
-            TweenService:Create(oldPage, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = UDim2.new(-dir, 0, 0, 85)}):Play()
-            task.delay(0.25, function() if activePage ~= oldPage then oldPage.Visible = false end end)
+            TweenService:Create(oldPage, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {Position = UDim2.new(-dir, 0, 0, 85)}):Play()
+            task.delay(0.4, function() if activePage ~= oldPage then oldPage.Visible = false end end)
         end
         pageObject.Position = UDim2.new(dir, 0, 0, 85)
         pageObject.Visible = true
-        TweenService:Create(pageObject, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 85)}):Play()
+        TweenService:Create(pageObject, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut), {Position = UDim2.new(0, 0, 0, 85)}):Play()
     end)
     table.insert(tabs, {btn = Btn, page = pageObject})
     if isDefault then 
@@ -1306,7 +1353,7 @@ local function createSlider(name, parent, min, max, default, step, settingKey, c
     Container.BackgroundTransparency = 1
     
     local Label = Instance.new("TextLabel", Container)
-    Label.Size = UDim2.new(0.5, 0, 0, 20)
+    Label.Size = UDim2.new(0.65, 0, 0, 20)
     Label.Position = UDim2.new(0, 12, 0, 6)
     Label.BackgroundTransparency = 1
     Label.Text = name
@@ -1316,7 +1363,7 @@ local function createSlider(name, parent, min, max, default, step, settingKey, c
     Label.TextXAlignment = Enum.TextXAlignment.Left
     
     local ValueText = Instance.new("TextBox", Container)
-    ValueText.Size = UDim2.new(0.5, 0, 0, 20)
+    ValueText.Size = UDim2.new(0.3, 0, 0, 20)
     ValueText.AnchorPoint = Vector2.new(1, 0)
     ValueText.Position = UDim2.new(1, -12, 0, 6)
     ValueText.BackgroundTransparency = 1
@@ -1326,6 +1373,7 @@ local function createSlider(name, parent, min, max, default, step, settingKey, c
     ValueText.TextSize = 13
     ValueText.TextXAlignment = Enum.TextXAlignment.Right
     ValueText.ClearTextOnFocus = false
+    ValueText.ClipsDescendants = true
     
     local SliderBG = Instance.new("TextButton", Container)
     SliderBG.Size = UDim2.new(1, -24, 0, 6)
@@ -1350,9 +1398,12 @@ local function createSlider(name, parent, min, max, default, step, settingKey, c
 
     local isDragging = false
     local function updateVisual(val)
-        val = math.clamp(val, min, max)
+        local maxAllowed = (settingKey == "smoothness" or settingKey == "predictStrength") and max or 5000
+        val = math.clamp(val, min, maxAllowed)
         settings[settingKey] = val
-        local snappedPos = (val - min) / (max - min)
+        
+        local visualVal = math.clamp(val, min, max)
+        local snappedPos = (visualVal - min) / (max - min)
         TweenService:Create(SliderFill, TweenInfo.new(0.1, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(snappedPos, 0, 1, 0)}):Play()
         ValueText.Text = tostring(val)
         if callback then callback(val) end
@@ -1655,6 +1706,16 @@ local WlStroke = Instance.new("UIStroke", WhitelistWindow)
 WlStroke.Thickness = 1.5
 WlStroke.Color = Theme.Border
 
+local WlTitle = Instance.new("TextLabel", WhitelistWindow)
+WlTitle.Size = UDim2.new(1, -30, 0, 30)
+WlTitle.Position = UDim2.new(0, 12, 0, 0)
+WlTitle.BackgroundTransparency = 1
+WlTitle.Text = "Aimbot Whitelist"
+WlTitle.TextColor3 = Theme.Accent
+WlTitle.Font = Enum.Font.GothamBold
+WlTitle.TextSize = 13
+WlTitle.TextXAlignment = Enum.TextXAlignment.Left
+
 local WlCloseBtn = Instance.new("TextButton", WhitelistWindow)
 WlCloseBtn.Size = UDim2.new(0, 20, 0, 20)
 WlCloseBtn.Position = UDim2.new(1, -25, 0, 5)
@@ -1694,28 +1755,37 @@ ScrollLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     end
 end)
 
-local wlExpanded = false
-local function toggleWlWindow()
-    wlExpanded = not wlExpanded
-    ToggleBtn.Text = wlExpanded and "Aimbot Whitelist <" or "Aimbot Whitelist >"
-    if wlExpanded then
+_G.wlStateShared = { wl = false, cWl = false }
+
+local function toggleWlWindow(forceClose)
+    if forceClose == true and not _G.wlStateShared.wl then return end
+    _G.wlStateShared.wl = forceClose == true and false or not _G.wlStateShared.wl
+    ToggleBtn.Text = _G.wlStateShared.wl and "Aimbot Whitelist <" or "Aimbot Whitelist >"
+    
+    if _G.wlStateShared.wl then
+        if _G.wlStateShared.cWl and _G.toggleCWlRef then 
+            _G.toggleCWlRef(true) 
+        end
         WhitelistWindow.Visible = true
         WhitelistWindow.Position = UDim2.new(0, Frame.Position.X.Offset + Frame.Size.X.Offset + 15, 0, Frame.Position.Y.Offset)
         WhitelistWindow.Size = UDim2.new(0, 0, 0, 373)
         local tw = TweenService:Create(WhitelistWindow, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 346, 0, 373)})
+        table.insert(activeTweens, tw)
         tw:Play()
     else
         local tw = TweenService:Create(WhitelistWindow, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 373)})
+        table.insert(activeTweens, tw)
         tw:Play()
-        tw.Completed:Connect(function() if not wlExpanded then WhitelistWindow.Visible = false end end)
+        tw.Completed:Connect(function() if not _G.wlStateShared.wl then WhitelistWindow.Visible = false end end)
     end
 end
+_G.toggleWlRef = toggleWlWindow
 
 ToggleBtn.MouseButton1Click:Connect(toggleWlWindow)
 WlCloseBtn.MouseButton1Click:Connect(toggleWlWindow)
 
 table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
-    if wlExpanded then
+    if _G.wlStateShared.wl then
         WhitelistWindow.Position = UDim2.new(0, Frame.Position.X.Offset + Frame.Size.X.Offset + 15, 0, Frame.Position.Y.Offset)
     end
 end))
@@ -1991,15 +2061,287 @@ do
 local AutoFarmGroup = createGroup(Pages.AutoLeft)
 createToggle("Auto Airdrop", AutoFarmGroup, "autoAirdrop")
 createToggle("Auto Crates", AutoFarmGroup, "autoCrates")
+
 local OilContainer = createToggle("Auto Oil", AutoFarmGroup, "autoOil")
+
 local TycoonGroup = createGroup(Pages.AutoRight)
 createToggle("Auto Build", TycoonGroup, "autoBuild")
+
+local CrateWlGroup = createGroup(Pages.AutoRight)
+local CrateToggleContainer = Instance.new("Frame", CrateWlGroup)
+CrateToggleContainer.Size = UDim2.new(1, 0, 0, 38)
+CrateToggleContainer.BackgroundTransparency = 1
+
+local CrateToggleBtn = Instance.new("TextButton", CrateToggleContainer)
+CrateToggleBtn.Size = UDim2.new(1, -24, 0, 26)
+CrateToggleBtn.AnchorPoint = Vector2.new(0.5, 0.5)
+CrateToggleBtn.Position = UDim2.new(0.5, 0, 0.5, 0)
+CrateToggleBtn.Text = "Crate Whitelist >"
+CrateToggleBtn.TextColor3 = Theme.TextMain
+CrateToggleBtn.Font = Enum.Font.GothamMedium
+CrateToggleBtn.TextSize = 13
+CrateToggleBtn.AutoButtonColor = false
+CrateToggleBtn.BackgroundColor3 = Theme.OffColor
+Instance.new("UICorner", CrateToggleBtn).CornerRadius = UDim.new(0, 4)
+Instance.new("UIStroke", CrateToggleBtn).Color = Theme.Border
+
+local CrateWhitelistWindow = Instance.new("Frame", ScreenGui)
+CrateWhitelistWindow.Name = "CrateWhitelistMenu"
+CrateWhitelistWindow.Size = UDim2.new(0, 0, 0, 373)
+CrateWhitelistWindow.BackgroundColor3 = Theme.Background
+CrateWhitelistWindow.BackgroundTransparency = Theme.BackgroundTrans
+CrateWhitelistWindow.BorderSizePixel = 0
+CrateWhitelistWindow.ClipsDescendants = true
+CrateWhitelistWindow.Visible = false
+Instance.new("UICorner", CrateWhitelistWindow).CornerRadius = UDim.new(0, 10)
+
+local CWlStroke = Instance.new("UIStroke", CrateWhitelistWindow)
+CWlStroke.Thickness = 1.5
+CWlStroke.Color = Theme.Border
+
+local CWlTitle = Instance.new("TextLabel", CrateWhitelistWindow)
+CWlTitle.Size = UDim2.new(1, -30, 0, 30)
+CWlTitle.Position = UDim2.new(0, 12, 0, 0)
+CWlTitle.BackgroundTransparency = 1
+CWlTitle.Text = "Crate Whitelist"
+CWlTitle.TextColor3 = Theme.Accent
+CWlTitle.Font = Enum.Font.GothamBold
+CWlTitle.TextSize = 13
+CWlTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local CWlCloseBtn = Instance.new("TextButton", CrateWhitelistWindow)
+CWlCloseBtn.Size = UDim2.new(0, 20, 0, 20)
+CWlCloseBtn.Position = UDim2.new(1, -25, 0, 5)
+CWlCloseBtn.BackgroundTransparency = 1
+CWlCloseBtn.Text = "X"
+CWlCloseBtn.TextColor3 = Color3.fromRGB(130, 50, 50)
+CWlCloseBtn.Font = Enum.Font.GothamBold
+CWlCloseBtn.TextSize = 14
+
+local CListScroll = Instance.new("ScrollingFrame", CrateWhitelistWindow)
+CListScroll.Size = UDim2.new(1, -24, 1, -50)
+CListScroll.Position = UDim2.new(0, 12, 0, 30)
+CListScroll.BackgroundColor3 = Theme.Background
+CListScroll.BackgroundTransparency = 1
+CListScroll.BorderSizePixel = 0
+CListScroll.ScrollBarThickness = 4
+CListScroll.ScrollingEnabled = false
+
+local CListPadding = Instance.new("UIPadding", CListScroll)
+CListPadding.PaddingTop = UDim.new(0, 2)
+CListPadding.PaddingBottom = UDim.new(0, 2)
+
+local CScrollLayout = Instance.new("UIListLayout", CListScroll)
+CScrollLayout.Padding = UDim.new(0, 4)
+CScrollLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+CScrollLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    local maxPlayersNoScroll = 10
+    local itemHeight = 32
+    local contentHeight = CScrollLayout.AbsoluteContentSize.Y
+    if contentHeight > (itemHeight * maxPlayersNoScroll) then
+        CListScroll.CanvasSize = UDim2.new(0, 0, 0, contentHeight + 10)
+        CListScroll.ScrollingEnabled = true
+    else
+        CListScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+        CListScroll.ScrollingEnabled = false
+    end
+end)
+
+local function toggleCWlWindow(forceClose)
+    if forceClose == true and not _G.wlStateShared.cWl then return end
+    _G.wlStateShared.cWl = forceClose == true and false or not _G.wlStateShared.cWl
+    CrateToggleBtn.Text = _G.wlStateShared.cWl and "Crate Whitelist <" or "Crate Whitelist >"
+    
+    if _G.wlStateShared.cWl then
+        if _G.wlStateShared.wl and _G.toggleWlRef then
+            _G.toggleWlRef(true)
+        end
+        CrateWhitelistWindow.Visible = true
+        CrateWhitelistWindow.Position = UDim2.new(0, Frame.Position.X.Offset + Frame.Size.X.Offset + 15, 0, Frame.Position.Y.Offset)
+        CrateWhitelistWindow.Size = UDim2.new(0, 0, 0, 373)
+        local tw = TweenService:Create(CrateWhitelistWindow, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 346, 0, 373)})
+        table.insert(activeTweens, tw)
+        tw:Play()
+    else
+        local tw = TweenService:Create(CrateWhitelistWindow, TweenInfo.new(0.3, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 373)})
+        table.insert(activeTweens, tw)
+        tw:Play()
+        tw.Completed:Connect(function() if not _G.wlStateShared.cWl then CrateWhitelistWindow.Visible = false end end)
+    end
+end
+_G.toggleCWlRef = toggleCWlWindow
+
+CrateToggleBtn.MouseButton1Click:Connect(toggleCWlWindow)
+CWlCloseBtn.MouseButton1Click:Connect(toggleCWlWindow)
+
+table.insert(scriptConnections, RunService.RenderStepped:Connect(function()
+    if _G.wlStateShared.cWl then
+        CrateWhitelistWindow.Position = UDim2.new(0, Frame.Position.X.Offset + Frame.Size.X.Offset + 15, 0, Frame.Position.Y.Offset)
+    end
+end))
+
+local crateWhitelistRows = {}
+updateCratePlayerRow = function(playerName)
+    pcall(function()
+        if not playerName or playerName == LocalPlayer.Name then return end
+        if type(settings.crateWhitelist) ~= "table" then settings.crateWhitelist = {} end
+
+        local plr = Players:FindFirstChild(playerName)
+        local isOnline = (plr ~= nil)
+        local isWl = settings.crateWhitelist[playerName] == true
+
+        if not isOnline and not isWl then
+            local rowData = crateWhitelistRows[playerName]
+            if rowData and rowData.Item then
+                crateWhitelistRows[playerName] = nil
+                rowData.Item:Destroy()
+            end
+            return
+        end
+
+        if not crateWhitelistRows[playerName] then
+            local Item = Instance.new("Frame")
+            Item.Size = UDim2.new(1, -12, 0, 28)
+            Item.Position = UDim2.new(0, 6, 0, 0)
+            Item.BackgroundTransparency = 1
+            Item.Parent = CListScroll
+
+            local Btn = Instance.new("TextButton", Item)
+            Btn.Size = UDim2.new(1, 0, 1, 0)
+            Btn.BackgroundColor3 = Theme.PanelBG
+            Btn.Text = ""
+            Btn.AutoButtonColor = false
+            Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 4)
+
+            local BtnStroke = Instance.new("UIStroke", Btn)
+            BtnStroke.Color = Theme.Accent
+            BtnStroke.Thickness = 1.5
+            BtnStroke.Transparency = 1
+            BtnStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+            local ContentContainer = Instance.new("Frame", Btn)
+            ContentContainer.Size = UDim2.new(1, -80, 1, 0)
+            ContentContainer.Position = UDim2.new(0, 8, 0, 0)
+            ContentContainer.BackgroundTransparency = 1
+            
+            local NameTeamLayout = Instance.new("UIListLayout", ContentContainer)
+            NameTeamLayout.FillDirection = Enum.FillDirection.Horizontal
+            NameTeamLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            NameTeamLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+            NameTeamLayout.Padding = UDim.new(0, 5)
+
+            local NameLbl = Instance.new("TextLabel", ContentContainer)
+            NameLbl.BackgroundTransparency = 1
+            NameLbl.Font = Enum.Font.GothamMedium
+            NameLbl.TextSize = 12
+            NameLbl.TextXAlignment = Enum.TextXAlignment.Left
+            NameLbl.AutomaticSize = Enum.AutomaticSize.X
+            
+            local TeamLbl = Instance.new("TextLabel", ContentContainer)
+            TeamLbl.BackgroundTransparency = 1
+            TeamLbl.Font = Enum.Font.Gotham
+            TeamLbl.TextSize = 11
+            TeamLbl.TextXAlignment = Enum.TextXAlignment.Left
+            TeamLbl.AutomaticSize = Enum.AutomaticSize.X
+            
+            local TeamUIStroke = Instance.new("UIStroke", TeamLbl)
+            TeamUIStroke.Color = Color3.new(255, 255, 255)
+            TeamUIStroke.Thickness = 0.2
+            TeamUIStroke.Transparency = 0.5
+
+            local StatusLbl = Instance.new("TextLabel", Btn)
+            StatusLbl.Size = UDim2.new(0, 70, 1, 0)
+            StatusLbl.AnchorPoint = Vector2.new(1, 0)
+            StatusLbl.Position = UDim2.new(1, -8, 0, 0)
+            StatusLbl.BackgroundTransparency = 1
+            StatusLbl.Font = Enum.Font.GothamMedium
+            StatusLbl.TextSize = 11
+            StatusLbl.TextXAlignment = Enum.TextXAlignment.Right
+
+            crateWhitelistRows[playerName] = {
+                Item = Item, Btn = Btn, BtnStroke = BtnStroke, NameLbl = NameLbl, TeamLbl = TeamLbl, StatusLbl = StatusLbl
+            }
+
+            Btn.MouseButton1Click:Connect(function()
+                pcall(function()
+                    settings.crateWhitelist[playerName] = not settings.crateWhitelist[playerName]
+                    updateCratePlayerRow(playerName)
+                end)
+            end)
+        end
+
+        local els = crateWhitelistRows[playerName]
+        if els then
+            local displayStr = tostring(playerName)
+            if string.len(displayStr) > 20 then displayStr = string.sub(displayStr, 1, 20) .. "..." end
+            els.NameLbl.Text = displayStr
+            
+            if isOnline and plr and plr.Team then
+                els.TeamLbl.Text = "[" .. plr.Team.Name .. "]"
+                local tCol = plr.Team.TeamColor.Color
+                els.TeamLbl.TextColor3 = Color3.fromRGB(math.clamp(tCol.R * 255 * 0.7, 0, 255), math.clamp(tCol.G * 255 * 0.7, 0, 255), math.clamp(tCol.B * 255 * 0.7, 0, 255))
+            else
+                els.TeamLbl.Text = "[No Team]"
+                els.TeamLbl.TextColor3 = Theme.TextSub
+            end
+
+            if isOnline then
+                els.StatusLbl.Text = "On server"
+                els.StatusLbl.TextColor3 = Color3.fromRGB(80, 160, 80)
+            else
+                els.StatusLbl.Text = "Offline"
+                els.StatusLbl.TextColor3 = Color3.fromRGB(160, 80, 80)
+            end
+
+            local strokeTargetTransparency = isWl and 0 or 1
+            TweenService:Create(els.BtnStroke, TweenInfo.new(0.2), {Transparency = strokeTargetTransparency}):Play()
+            
+            els.Btn.BackgroundColor3 = Theme.PanelBG
+            els.Btn.BackgroundTransparency = 0
+            els.NameLbl.TextColor3 = Theme.TextMain
+        end
+    end)
+end
+
+local function trackCratePlayer(plr)
+    pcall(function()
+        if not plr then return end
+        updateCratePlayerRow(plr.Name)
+        table.insert(scriptConnections, plr:GetPropertyChangedSignal("Team"):Connect(function()
+            pcall(function() updateCratePlayerRow(plr.Name) end)
+        end))
+    end)
+end
+
+task.spawn(function()
+    pcall(function()
+        task.wait(0.5)
+        for _, plr in ipairs(Players:GetPlayers()) do trackCratePlayer(plr) end
+        if type(settings.crateWhitelist) == "table" then
+            for savedName, isSaved in pairs(settings.crateWhitelist) do
+                if isSaved and not Players:FindFirstChild(savedName) then
+                    pcall(function() updateCratePlayerRow(savedName) end)
+                end
+            end
+        end
+    end)
+end)
+
+pcall(function()
+    table.insert(scriptConnections, Players.PlayerAdded:Connect(trackCratePlayer))
+    table.insert(scriptConnections, Players.PlayerRemoving:Connect(function(plr)
+        pcall(function() updateCratePlayerRow(plr.Name) end)
+    end))
+end)
+
 local OilModal = Instance.new("Frame", ScreenGui)
 OilModal.Size = UDim2.new(1, 0, 1, 0)
 OilModal.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 OilModal.BackgroundTransparency = 0.7
 OilModal.ZIndex = 80
 OilModal.Visible = false
+
 local OilWindow = Instance.new("Frame", OilModal)
 OilWindow.Size = UDim2.new(0, 0, 0, 0)
 OilWindow.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -2009,6 +2351,7 @@ OilWindow.ClipsDescendants = true
 OilWindow.ZIndex = 81
 Instance.new("UICorner", OilWindow).CornerRadius = UDim.new(0, 8)
 Instance.new("UIStroke", OilWindow).Color = Theme.Border
+
 local OilText = Instance.new("TextLabel", OilWindow)
 OilText.Size = UDim2.new(1, -20, 1, -50)
 OilText.Position = UDim2.new(0, 10, 0, 10)
@@ -2019,6 +2362,7 @@ OilText.TextWrapped = true
 OilText.Font = Enum.Font.GothamMedium
 OilText.TextSize = 13
 OilText.ZIndex = 82
+
 local OilIdcBtn = Instance.new("TextButton", OilWindow)
 OilIdcBtn.Size = UDim2.new(0, 100, 0, 26)
 OilIdcBtn.AnchorPoint = Vector2.new(0.5, 1)
@@ -2038,6 +2382,7 @@ OilIdcBtn.MouseButton1Click:Connect(function()
     tw.Completed:Wait()
     OilModal.Visible = false
 end)
+
 local InfoBtn = Instance.new("TextButton", OilContainer)
 InfoBtn.Size = UDim2.new(0, 20, 0, 20)
 InfoBtn.AnchorPoint = Vector2.new(1, 0.5)
@@ -2053,6 +2398,7 @@ InfoBtn.MouseButton1Click:Connect(function()
     if OilModal.Visible then return end
     OilModal.Visible = true
     OilWindow.Size = UDim2.new(0, 0, 0, 0)
+
     local tw = TweenService:Create(OilWindow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 260, 0, 140)})
     table.insert(activeTweens, tw)
     tw:Play()
@@ -2069,6 +2415,7 @@ createKeybind("Free Cam Bind", BindsGroup, "freeCam")
 
 local ClientGroup = createGroup(Pages.MiscLeft)
 createToggle("Anti AFK", ClientGroup, "antiAfk")
+
 local FreeCamContainer = createToggle("Free Cam", ClientGroup, "freeCam")
 createSlider("Free Cam Speed", ClientGroup, 5, 1000, settings.freeCamSpeed, 5, "freeCamSpeed")
 
@@ -2338,6 +2685,17 @@ local function doLoadConfig()
                                 pcall(function() updatePlayerRow(name) end)
                             end
                         end
+                    elseif k == "crateWhitelist" then
+                        local oldCWl = settings.crateWhitelist or {}
+                        settings.crateWhitelist = v
+                        for name, _ in pairs(oldCWl) do
+                            pcall(function() if updateCratePlayerRow then updateCratePlayerRow(name) end end)
+                        end
+                        for name, isWl in pairs(v) do
+                            if isWl then
+                                pcall(function() if updateCratePlayerRow then updateCratePlayerRow(name) end end)
+                            end
+                        end
                     elseif k ~= "__timestamp" then
                         if uiUpdaters[k] then uiUpdaters[k](v) else settings[k] = v end
                     end
@@ -2397,21 +2755,32 @@ refreshConfigs = function(forceRefresh)
             local cfgDataCache = {}
             local count = 0
             for _, file in ipairs(files) do
-                local cfgName = file:match("PlayerCfg_(.*)%.json")
-                if cfgName then 
-                    table.insert(cfgNames, cfgName) 
+                local rawName = file:match("PlayerCfg_(.*)%.json")
+                if rawName then 
+                    local isCorrupt = true
                     pcall(function()
-                        local decoded = HttpService:JSONDecode(readfile(file))
-                        cfgDataCache[cfgName] = decoded.__timestamp or 0
+                        local content = readfile(file)
+                        if content and content ~= "" then
+                            local decoded = HttpService:JSONDecode(content)
+                            if type(decoded) == "table" then
+                                cfgDataCache[rawName] = decoded.__timestamp or 0
+                                isCorrupt = false
+                            end
+                        end
                     end)
+                    local displayName = isCorrupt and (rawName .. " [BROKEN]") or rawName
+                    if isCorrupt then cfgDataCache[displayName] = 0 end
+                    table.insert(cfgNames, displayName) 
                 end
                 count = count + 1
                 if count % 15 == 0 then task.wait() end
             end
             
             table.sort(cfgNames, function(a, b)
-                local aFav = favorites[a] or false
-                local bFav = favorites[b] or false
+                local aReal = string.gsub(a, " %[BROKEN%]", "")
+                local bReal = string.gsub(b, " %[BROKEN%]", "")
+                local aFav = favorites[aReal] or false
+                local bFav = favorites[bReal] or false
                 if aFav == bFav then 
                     return (cfgDataCache[a] or 0) > (cfgDataCache[b] or 0)
                 end
@@ -2424,8 +2793,9 @@ refreshConfigs = function(forceRefresh)
             
             for _, child in ipairs(ConfigList:GetChildren()) do if child:IsA("Frame") then child:Destroy() end end
             
-                        for _, cfgName in ipairs(cfgNames) do
-                local isFav = favorites[cfgName] or false
+            for _, cfgName in ipairs(cfgNames) do
+                local realName = string.gsub(cfgName, " %[BROKEN%]", "")
+                local isFav = favorites[realName] or false
                 local Item = Instance.new("Frame", ConfigList)
                 Item.Size = UDim2.new(1, -12, 0, 28)
                 Item.Position = UDim2.new(0, 6, 0, 0)
@@ -2433,9 +2803,9 @@ refreshConfigs = function(forceRefresh)
                 Instance.new("UICorner", Item).CornerRadius = UDim.new(0, 4)
                 
                 local ItemStroke = Instance.new("UIStroke", Item)
-                ItemStroke.Color = Theme.Accent
+                ItemStroke.Color = string.find(cfgName, "%[BROKEN%]") and Color3.fromRGB(255, 80, 80) or Theme.Accent
                 ItemStroke.Thickness = 1.5
-                ItemStroke.Transparency = (cfgName == currentConfigName) and 0 or 1
+                ItemStroke.Transparency = (realName == currentConfigName) and 0 or 1
                 ItemStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
                 
                 local SelectBtn = Instance.new("TextButton", Item)
@@ -2444,7 +2814,7 @@ refreshConfigs = function(forceRefresh)
                 SelectBtn.ZIndex = 1
                 SelectBtn.BackgroundTransparency = 1
                 SelectBtn.Text = cfgName
-                SelectBtn.TextColor3 = Theme.TextMain
+                SelectBtn.TextColor3 = string.find(cfgName, "%[BROKEN%]") and Color3.fromRGB(255, 80, 80) or Theme.TextMain
                 SelectBtn.Font = Enum.Font.GothamMedium
                 SelectBtn.TextSize = 12
                 SelectBtn.TextXAlignment = Enum.TextXAlignment.Left
@@ -2483,8 +2853,9 @@ refreshConfigs = function(forceRefresh)
                 EditBtn.TextColor3 = Theme.TextSub
                 
                 SelectBtn.MouseButton1Click:Connect(function()
-                    currentConfigName = cfgName
-                    if ConfigTextBox then ConfigTextBox.Text = cfgName end
+                    if string.find(cfgName, "%[BROKEN%]") then return end
+                    currentConfigName = realName
+                    if ConfigTextBox then ConfigTextBox.Text = realName end
                     for _, child in ipairs(ConfigList:GetChildren()) do
                         if child:IsA("Frame") then
                             local stroke = child:FindFirstChildOfClass("UIStroke")
@@ -2498,24 +2869,26 @@ refreshConfigs = function(forceRefresh)
                 end)
 
                 EditBtn.MouseButton1Click:Connect(function()
-                    targetRenameCfg = cfgName
-                    RInput.Text = cfgName
+                    if string.find(cfgName, "%[BROKEN%]") then return end
+                    targetRenameCfg = realName
+                    RInput.Text = realName
                     RenameModal.Visible = true
                 end)
 
                 FavBtn.MouseButton1Click:Connect(function()
-                    favorites[cfgName] = not favorites[cfgName]
+                    if string.find(cfgName, "%[BROKEN%]") then return end
+                    favorites[realName] = not favorites[realName]
                     pcall(function() writefile("Player_Favorites.json", HttpService:JSONEncode(favorites)) end)
                     refreshConfigs(true)
                 end)
 
                 DelBtn.MouseButton1Click:Connect(function()
-                    pcall(function() delfile("PlayerCfg_"..cfgName..".json") end)
-                    if favorites[cfgName] ~= nil then
-                        favorites[cfgName] = nil
+                    pcall(function() delfile("PlayerCfg_"..realName..".json") end)
+                    if favorites[realName] ~= nil then
+                        favorites[realName] = nil
                         pcall(function() writefile("Player_Favorites.json", HttpService:JSONEncode(favorites)) end)
                     end
-                    if currentConfigName == cfgName then
+                    if currentConfigName == realName then
                         currentConfigName = "default"
                         if ConfigTextBox then ConfigTextBox.Text = "" end
                     end
@@ -2535,13 +2908,22 @@ task.spawn(function()
             local cfgDataCache = {}
             local count = 0
             for _, file in ipairs(files) do
-                local cfgName = file:match("PlayerCfg_(.*)%.json")
-                if cfgName then 
-                    table.insert(cfgNames, cfgName) 
+                local rawName = file:match("PlayerCfg_(.*)%.json")
+                if rawName then 
+                    local isCorrupt = true
                     pcall(function()
-                        local decoded = HttpService:JSONDecode(readfile(file))
-                        cfgDataCache[cfgName] = decoded.__timestamp or 0
+                        local content = readfile(file)
+                        if content and content ~= "" then
+                            local decoded = HttpService:JSONDecode(content)
+                            if type(decoded) == "table" then
+                                cfgDataCache[rawName] = decoded.__timestamp or 0
+                                isCorrupt = false
+                            end
+                        end
                     end)
+                    if not isCorrupt then
+                        table.insert(cfgNames, rawName) 
+                    end
                 end
                 count = count + 1
                 if count % 15 == 0 then task.wait() end
@@ -2555,19 +2937,6 @@ task.spawn(function()
             if #cfgNames > 0 then
                 currentConfigName = cfgNames[1]
                 if ConfigTextBox then ConfigTextBox.Text = currentConfigName end
-                if isfile("PlayerCfg_"..currentConfigName..".json") then
-                    local decoded = HttpService:JSONDecode(readfile("PlayerCfg_"..currentConfigName..".json"))
-                    for k, v in pairs(decoded) do
-                        if k == "binds" then
-                            for bindK, bindV in pairs(v) do
-                                settings.binds[bindK] = bindV and Enum.KeyCode[bindV] or nil
-                                if uiUpdaters["bind_"..bindK] then uiUpdaters["bind_"..bindK]() end
-                            end
-                        elseif k ~= "__timestamp" then
-                            if uiUpdaters[k] then uiUpdaters[k](v) else settings[k] = v end
-                        end
-                    end
-                end
             end
         end)
     end
@@ -2736,8 +3105,14 @@ local function UnloadScript()
             Camera.CameraType = Enum.CameraType.Custom
         end
     end
-    
+
     resetHitboxes()
+end
+
+local finalBaseUnload = executeUnload
+executeUnload = function()
+    pcall(finalBaseUnload)
+    pcall(UnloadScript)
 end
 
 local targetFps = 60
@@ -3805,18 +4180,20 @@ task.spawn(function()
 
     local wasAutoCrates = false
     local firstCrateTurnIn = true
+    local originalPos = nil
 
     while isScriptActive do
-        task.wait(0.15)
         if settings.autoCrates then
-            if not wasAutoCrates then
-                firstCrateTurnIn = true
-                wasAutoCrates = true
-            end
-            
             local char = LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             local hum = char and char:FindFirstChild("Humanoid")
+
+            if not wasAutoCrates then
+                firstCrateTurnIn = true
+                wasAutoCrates = true
+                if hrp then originalPos = hrp.CFrame end
+            end
+            
             if hrp and hum and hum.Health > 0 then
                 local carrying = char:FindFirstChild("CrateWeld") ~= nil
                 if carrying then
@@ -3834,12 +4211,16 @@ task.spawn(function()
                             task.wait(0.2)
                             firstCrateTurnIn = false
                         else
-                            task.wait(1.5)
+                            local waitTime = tick()
+                            while tick() - waitTime < 1.5 and settings.autoCrates and isScriptActive do task.wait(0.1) end
                         end
 
-                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                        task.wait(3.2)
-                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                        if settings.autoCrates then
+                            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                            local holdTime = tick()
+                            while tick() - holdTime < 3.2 and settings.autoCrates and isScriptActive do task.wait(0.1) end
+                            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                        end
                     end
                 else
                     local col = workspace:FindFirstChild("Game Systems") and workspace["Game Systems"]:FindFirstChild("Collectibles Workspace")
@@ -3851,9 +4232,24 @@ task.spawn(function()
                             if item:IsA("Model") and not item:GetAttribute("Disabled") then
                                 local owner = item:GetAttribute("Owner")
                                 local team = item:GetAttribute("Team")
-                                if owner == LocalPlayer.Name or (LocalPlayer.Team and tostring(team) == LocalPlayer.Team.Name) then
+
+                                local isWhitelisted = false
+                                if settings.crateWhitelist then
+                                    for wlName, wlEnabled in pairs(settings.crateWhitelist) do
+                                        if wlEnabled then
+                                            local wlPlayer = Players:FindFirstChild(wlName)
+                                            if wlPlayer and wlPlayer.Team and wlPlayer.Team.Name == tostring(team) then
+                                                isWhitelisted = true
+                                                break
+                                            end
+                                        end
+                                    end
+                                end
+
+                                if owner == LocalPlayer.Name or (LocalPlayer.Team and tostring(team) == LocalPlayer.Team.Name) or isWhitelisted then
                                     continue
                                 end
+                                
                                 local part = item:FindFirstChild("MainPart") or item.PrimaryPart or item:FindFirstChildWhichIsA("BasePart")
                                 if part then
                                     if not isPlayerNearby(part.Position, 200, nil) then
@@ -3882,12 +4278,11 @@ task.spawn(function()
                                     hrp.CFrame = CFrame.new(-503, 177, -1021)
                                 end
                                 hrp.Velocity = Vector3.new(0,0,0)
-                            else
-                                task.wait(0.1)
+                            elseif settings.autoCrates then
                                 VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
                                 local pickupStart = tick()
                                 local interrupted = false
-                                while (tick() - pickupStart) < 3.2 and isScriptActive do
+                                while (tick() - pickupStart) < 3.2 and isScriptActive and settings.autoCrates do
                                     if isPlayerNearby(part.Position, 200, LocalPlayer) then
                                         interrupted = true
                                         sendBindNotification("Someone is nearby crate!", false)
@@ -3911,9 +4306,20 @@ task.spawn(function()
                 end
             end
         else
+            if wasAutoCrates then
+                local char = LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp and originalPos then
+                    hrp.CFrame = originalPos
+                    hrp.Velocity = Vector3.new(0,0,0)
+                end
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+            end
             wasAutoCrates = false
             firstCrateTurnIn = true
+            originalPos = nil
         end
+        task.wait(0.1)
     end
 end)
 
@@ -3931,18 +4337,20 @@ task.spawn(function()
 
     local wasAutoOil = false
     local firstOilTurnIn = true
+    local originalPos = nil
 
     while isScriptActive do
-        task.wait(0.15)
         if settings.autoOil then
-            if not wasAutoOil then
-                firstOilTurnIn = true
-                wasAutoOil = true
-            end
-            
             local char = LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             local hum = char and char:FindFirstChild("Humanoid")
+
+            if not wasAutoOil then
+                firstOilTurnIn = true
+                wasAutoOil = true
+                if hrp then originalPos = hrp.CFrame end
+            end
+            
             if hrp and hum and hum.Health > 0 then
                 local carrying = char:FindFirstChild("OilWeld") ~= nil or char:FindFirstChild("BarrelWeld") ~= nil or char:FindFirstChild("CrateWeld") ~= nil or char:FindFirstChild("OilBarrelWeld") ~= nil
                 if carrying then
@@ -3960,12 +4368,16 @@ task.spawn(function()
                             task.wait(0.2)
                             firstOilTurnIn = false
                         else
-                            task.wait(1.5)
+                            local waitTime = tick()
+                            while tick() - waitTime < 1.5 and settings.autoOil and isScriptActive do task.wait(0.1) end
                         end
 
-                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                        task.wait(3.2)
-                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                        if settings.autoOil then
+                            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                            local holdTime = tick()
+                            while tick() - holdTime < 3.2 and settings.autoOil and isScriptActive do task.wait(0.1) end
+                            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                        end
                     end
                 else
                     local col = workspace:FindFirstChild("Game Systems") and workspace["Game Systems"]:FindFirstChild("Collectibles Workspace")
@@ -4008,12 +4420,11 @@ task.spawn(function()
                                     hrp.CFrame = CFrame.new(-503, 177, -1021)
                                 end
                                 hrp.Velocity = Vector3.new(0,0,0)
-                            else
-                                task.wait(0.1)
+                            elseif settings.autoOil then
                                 VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
                                 local pickupStart = tick()
                                 local interrupted = false
-                                while (tick() - pickupStart) < 3.2 and isScriptActive do
+                                while (tick() - pickupStart) < 3.2 and isScriptActive and settings.autoOil do
                                     if isPlayerNearby(part.Position, 200, LocalPlayer) then
                                         interrupted = true
                                         sendBindNotification("Someone is nearby crate!", false)
@@ -4037,15 +4448,28 @@ task.spawn(function()
                 end
             end
         else
+            if wasAutoOil then
+                local char = LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp and originalPos then
+                    hrp.CFrame = originalPos
+                    hrp.Velocity = Vector3.new(0,0,0)
+                end
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+            end
             wasAutoOil = false
             firstOilTurnIn = true
+            originalPos = nil
         end
+        task.wait(0.1)
     end
 end)
 
 task.spawn(function()
+    local wasAutoAirdrop = false
+    local originalPos = nil
+
     while isScriptActive do
-        task.wait(1)
         if settings.autoAirdrop then
             local targetObj = nil
             local collectibles = workspace:FindFirstChild("Game Systems") and workspace["Game Systems"]:FindFirstChild("Collectibles Workspace")
@@ -4069,21 +4493,39 @@ task.spawn(function()
                 local hum = char and char:FindFirstChild("Humanoid")
                 
                 if hrp and hum and hum.Health > 0 and isScriptActive then
-                    local originalPos = hrp.CFrame
+                    if not wasAutoAirdrop then
+                        originalPos = hrp.CFrame
+                        wasAutoAirdrop = true
+                    end
+
                     local targetCF, targetSize = targetObj:GetBoundingBox()
-                    
                     hrp.CFrame = targetCF + Vector3.new(0, targetSize.Y/2 + 2, 0)
                     hrp.Velocity = Vector3.new(0,0,0)
                     
                     task.wait(0.2)
-                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                    task.wait(3.5)
-                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-                    
+                    if settings.autoAirdrop then
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                        local t = tick()
+                        while tick() - t < 3.5 and settings.autoAirdrop and isScriptActive do
+                            task.wait(0.1)
+                        end
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                    end
+                end
+            end
+        else
+            if wasAutoAirdrop then
+                local char = LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp and originalPos then
                     hrp.CFrame = originalPos
                     hrp.Velocity = Vector3.new(0, 0, 0)
                 end
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
             end
+            wasAutoAirdrop = false
+            originalPos = nil
         end
+        task.wait(0.2)
     end
 end)
