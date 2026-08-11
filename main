@@ -1,18 +1,22 @@
-local abortExecution = false
-local executeUnload = function() abortExecution = true end
+_G.PlayerScriptVersion = (_G.PlayerScriptVersion or 0) + 1
+local myVersion = _G.PlayerScriptVersion
 
-local previousUnloader = _G.WihikkScriptUnload
-_G.WihikkScriptUnload = function() pcall(executeUnload) end
-
-if type(previousUnloader) == "function" then
-    pcall(previousUnloader)
-elseif type(previousUnloader) == "table" then
-    for _, fn in ipairs(previousUnloader) do pcall(fn) end
+if _G.PlayerScriptUnload then
+    pcall(_G.PlayerScriptUnload)
+    _G.PlayerScriptUnload = nil
 end
 
-task.wait(0.2)
-if abortExecution then return 
+if _G.PlayerScriptUnloaders then
+    for _, unloader in pairs(_G.PlayerScriptUnloaders) do
+        pcall(unloader)
+    end
+    table.clear(_G.PlayerScriptUnloaders)
+else
+    _G.PlayerScriptUnloaders = {}
 end
+
+task.wait(0.25)
+if _G.PlayerScriptVersion ~= myVersion then return end
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -49,12 +53,6 @@ local scriptConnections = {}
 local activeTweens = {}
 local isScriptActive = true
 local isLoaded = false
-
-local baseUnload = executeUnload
-executeUnload = function()
-    isScriptActive = false
-    pcall(baseUnload)
-end
 
 local baseSpawnCFrame = nil
 local customSpawnCFrame = nil
@@ -3109,11 +3107,9 @@ local function UnloadScript()
     resetHitboxes()
 end
 
-local finalBaseUnload = executeUnload
-executeUnload = function()
-    pcall(finalBaseUnload)
-    pcall(UnloadScript)
-end
+local myUnloaderId = game:GetService("HttpService"):GenerateGUID(false)
+_G.PlayerScriptUnloaders[myUnloaderId] = UnloadScript
+
 
 local targetFps = 60
 local frameDelay = 1 / targetFps
