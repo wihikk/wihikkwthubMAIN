@@ -974,55 +974,18 @@ task.delay(0.5, function()
     sendBindNotification("User device: " .. devCheckName, nil, 7.5)
     sendBindNotification("User executor: " .. execName, nil, 7.5)
 
-    if execName ~= "Real" then
-        sendBindNotification("Sorry, but your executor might be not supported, tested on Real", nil, 7.5)
+    if execName ~= "Real" and not string.find(execLower, "delta") or string.find(execLower, "xeno") or string.find(execLower, "solara") then
+        sendBindNotification("Sorry, but your executor might be not supported, tested on Real", false, 7.5)
     end
 
     local execLower = string.lower(execName)
     if string.find(execLower, "delta") or string.find(execLower, "xeno") or string.find(execLower, "solara") then
-        sendBindNotification("Sorry, but your executor is not supported, a lot of features might not work", nil, 7.5)
+        sendBindNotification("Sorry, but your executor is not supported, a lot of features might not work", false, 7.5)
     end
 
 
     if devCheckName ~= "PC / Laptop" then
-        local txtSvc = game:GetService("TextService")
-        local dStr = "Sorry, but your device is NOT supported, a lot of features might not work"
-        local bnds = txtSvc:GetTextSize(dStr, 13, Enum.Font.GothamBold, Vector2.new(160, 9999))
-        local tH = math.max(32, bnds.Y + 15)
-        
-        local ntf = Instance.new("Frame", NotifContainer)
-        ntf.Size = UDim2.new(0.8, 0, 0, tH)
-        ntf.BackgroundColor3 = Theme.PanelBG
-        ntf.BackgroundTransparency = 0.1
-        ntf.Position = UDim2.new(0, 250, 0, 0)
-        ntf.ClipsDescendants = true
-        Instance.new("UICorner", ntf).CornerRadius = UDim.new(0, 6)
-        
-        local strk = Instance.new("UIStroke", ntf)
-        strk.Color = Color3.fromRGB(255, 0, 0)
-        strk.Thickness = 2
-        
-        local txt = Instance.new("TextLabel", ntf)
-        txt.Size = UDim2.new(1, -10, 1, -6)
-        txt.Position = UDim2.new(0, 5, 0, 3)
-        txt.BackgroundTransparency = 1
-        txt.TextWrapped = true
-        txt.Text = dStr
-        txt.TextColor3 = Color3.fromRGB(255, 100, 100)
-        txt.Font = Enum.Font.GothamBold
-        txt.TextSize = 13
-        
-        local br = Instance.new("Frame", ntf)
-        br.Size = UDim2.new(1, 0, 0, 3)
-        br.Position = UDim2.new(0, 0, 1, -3)
-        br.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-        br.BorderSizePixel = 0
-        
-        local tIn = TweenService:Create(ntf, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = UDim2.new(0, 0, 0, 0), Size = UDim2.new(1, 0, 0, tH)})
-        tIn:Play()
-        
-        local bTw = TweenService:Create(br, TweenInfo.new(10, Enum.EasingStyle.Linear, Enum.EasingDirection.Out), {Size = UDim2.new(0, 0, 0, 3)})
-        bTw:Play() 
+        sendBindNotification("Sorry, but your executor is not supported, a lot of features might not work", false, 7.5)
     end
 end)
 
