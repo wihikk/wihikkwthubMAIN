@@ -974,18 +974,18 @@ task.delay(0.5, function()
     sendBindNotification("User device: " .. devCheckName, nil, 7.5)
     sendBindNotification("User executor: " .. execName, nil, 7.5)
 
-    if execName ~= "Real" and not string.find(execLower, "delta") or string.find(execLower, "xeno") or string.find(execLower, "solara") then
-        sendBindNotification("Sorry, but your executor might be not supported, tested on Real", false, 7.5)
-    end
-
     local execLower = string.lower(execName)
-    if string.find(execLower, "delta") or string.find(execLower, "xeno") or string.find(execLower, "solara") then
+    local isKnown = string.find(execLower, "\100\101\108\116\97") or string.find(execLower, "\120\101\110\111") or string.find(execLower, "\115\111\108\97\114\97")
+    
+    if not isKnown then
+        sendBindNotification("Sorry, but your executor might be not supported, tested on Real", false, 7.5)
+        else
         sendBindNotification("Sorry, but your executor is not supported, a lot of features might not work", false, 7.5)
+        
     end
-
 
     if devCheckName ~= "PC / Laptop" then
-        sendBindNotification("Sorry, but your executor is not supported, a lot of features might not work", false, 7.5)
+        sendBindNotification("Sorry, but your device is not supported, a lot of features might not work", false, 7.5)
     end
 end)
 
@@ -1171,7 +1171,7 @@ if isMobile then
     statsScale.Scale = 0.5
 end
 
-local targetStatsPos = isMobile and UDim2.new(0, 10, 0, 10) or UDim2.new(0, 16, 0, 46)
+local targetStatsPos = isMobile and UDim2.new(0, 10, 0, 50) or UDim2.new(0, 16, 0, 46)
 TweenService:Create(StatsContainer, TweenInfo.new(0.6, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = targetStatsPos}):Play()
 
 local StatsStroke = Instance.new("UIStroke", StatsContainer)
@@ -1363,7 +1363,7 @@ MainStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 local HubBtn = Instance.new("TextButton", ScreenGui)
 HubBtn.Size = UDim2.new(0, 130, 0, 26)
-HubBtn.Position = isMobile and UDim2.new(0, 10, 0, 40) or UDim2.new(0, 15, 0, 70)
+HubBtn.Position = isMobile and UDim2.new(0, 10, 0, 80) or UDim2.new(0, 15, 0, 70)
 if isMobile then
     local hubScale = Instance.new("UIScale", HubBtn)
     hubScale.Scale = 0.5
