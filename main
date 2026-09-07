@@ -881,7 +881,7 @@ end)
     
     if isMobile then
         local notifScale = Instance.new("UIScale", NotifContainer)
-        notifScale.Scale = 0.75
+        notifScale.Scale = 0.5
     end
 
     local NotifLayout = Instance.new("UIListLayout", NotifContainer)
@@ -1025,7 +1025,7 @@ if not skipAuth then
     Instance.new("UIStroke", KeyWindow).Color = Theme.Border
     if isMobile then
         local keyScale = Instance.new("UIScale", KeyWindow)
-        keyScale.Scale = 0.75
+        keyScale.Scale = 0.5
     end
 
     local KCloseBtn = Instance.new("TextButton", KeyWindow)
@@ -1168,7 +1168,7 @@ StatsContainer.ClipsDescendants = true
 Instance.new("UICorner", StatsContainer).CornerRadius = UDim.new(0, 6)
 if isMobile then
     local statsScale = Instance.new("UIScale", StatsContainer)
-    statsScale.Scale = 0.8
+    statsScale.Scale = 0.5
 end
 
 local targetStatsPos = isMobile and UDim2.new(0, 10, 0, 10) or UDim2.new(0, 16, 0, 46)
@@ -1285,7 +1285,7 @@ VehHealthLabel.Position = isMobile and UDim2.new(1, -15, 1, -100) or UDim2.new(1
 VehHealthLabel.BackgroundTransparency = 1
 if isMobile then
     local vehScale = Instance.new("UIScale", VehHealthLabel)
-    vehScale.Scale = 0.8
+    vehScale.Scale = 0.5
 end
 VehHealthLabel.Text = ""
 VehHealthLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
@@ -1353,7 +1353,7 @@ Frame.ClipsDescendants = true
 Frame.Visible = false
 if isMobile then
     local mainScale = Instance.new("UIScale", Frame)
-    mainScale.Scale = 0.65
+    mainScale.Scale = 0.5
 end
 Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 10)
 local MainStroke = Instance.new("UIStroke", Frame)
@@ -1366,7 +1366,7 @@ HubBtn.Size = UDim2.new(0, 130, 0, 26)
 HubBtn.Position = isMobile and UDim2.new(0, 10, 0, 40) or UDim2.new(0, 15, 0, 70)
 if isMobile then
     local hubScale = Instance.new("UIScale", HubBtn)
-    hubScale.Scale = 0.8
+    hubScale.Scale = 0.5
 end
 HubBtn.BackgroundColor3 = Theme.PanelBG
 HubBtn.BackgroundTransparency = 1
@@ -1378,6 +1378,7 @@ HubBtn.TextSize = 12
 HubBtn.Visible = false
 HubBtn.AutoButtonColor = false
 Instance.new("UICorner", HubBtn).CornerRadius = UDim.new(0, 6)
+
 local HubStroke = Instance.new("UIStroke", HubBtn)
 HubStroke.Color = Theme.Border
 HubStroke.Thickness = 1
@@ -1610,7 +1611,7 @@ do
     Instance.new("UIStroke", DevPassWindow).Color = Theme.Border
     if isMobile then
         local devPassScale = Instance.new("UIScale", DevPassWindow)
-        devPassScale.Scale = 0.75
+        devPassScale.Scale = 0.5
     end
 
     local DPTitle = Instance.new("TextLabel", DevPassWindow)
@@ -1672,7 +1673,7 @@ do
     DevPanel.Visible = false
     if isMobile then
         local devPanelScale = Instance.new("UIScale", DevPanel)
-        devPanelScale.Scale = 0.75
+        devPanelScale.Scale = 0.5
     end
     Instance.new("UICorner", DevPanel).CornerRadius = UDim.new(0, 8)
     Instance.new("UIStroke", DevPanel).Color = Theme.Border
@@ -1942,7 +1943,7 @@ TpToPlayerWindow.ClipsDescendants = true
 TpToPlayerWindow.Visible = false
 if isMobile then
     local tpScale = Instance.new("UIScale", TpToPlayerWindow)
-    tpScale.Scale = 0.65
+    tpScale.Scale = 0.5
 end
 Instance.new("UICorner", TpToPlayerWindow).CornerRadius = UDim.new(0, 10)
 local TpPlStroke = Instance.new("UIStroke", TpToPlayerWindow)
@@ -2229,7 +2230,7 @@ TPRenameWindow.BackgroundColor3 = Theme.PanelBG
 TPRenameWindow.ZIndex = 51
 if isMobile then
     local tprScale = Instance.new("UIScale", TPRenameWindow)
-    tprScale.Scale = 0.75
+    tprScale.Scale = 0.5
 end
 Instance.new("UICorner", TPRenameWindow).CornerRadius = UDim.new(0, 8)
 Instance.new("UIStroke", TPRenameWindow).Color = Theme.Border
@@ -2318,7 +2319,7 @@ CustomTpWindow.ClipsDescendants = true
 CustomTpWindow.Visible = false
 if isMobile then
     local cTpScale = Instance.new("UIScale", CustomTpWindow)
-    cTpScale.Scale = 0.65
+    cTpScale.Scale = 0.5
 end
 Instance.new("UICorner", CustomTpWindow).CornerRadius = UDim.new(0, 10)
 local CTpStroke = Instance.new("UIStroke", CustomTpWindow)
