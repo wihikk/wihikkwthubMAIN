@@ -978,14 +978,14 @@ task.delay(0.5, function()
     local isKnown = string.find(execLower, "\100\101\108\116\97") or string.find(execLower, "\120\101\110\111") or string.find(execLower, "\115\111\108\97\114\97")
     
     if not isKnown then
-        sendBindNotification("Sorry, but your executor might be not supported, tested on Real", false, 7.5)
+        sendBindNotification("Sorry, but your executor might be not supported, tested on Real", nil, 7.5)
         else
-        sendBindNotification("Sorry, but your executor is not supported, a lot of features might not work", false, 7.5)
+        sendBindNotification("Sorry, but your executor is not supported, a lot of features might not work", nil, 7.5)
         
     end
 
     if devCheckName ~= "PC / Laptop" then
-        sendBindNotification("Sorry, but your device is not supported, a lot of features might not work", false, 7.5)
+        sendBindNotification("Sorry, but your device is not supported, a lot of features might not work", nil, 7.5)
     end
 end)
 
