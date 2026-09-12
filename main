@@ -1415,7 +1415,6 @@ local guiVisible = false
 
 local isMobile = (game:GetService("UserInputService").TouchEnabled and not game:GetService("UserInputService").MouseEnabled)
 local Frame = Instance.new("Frame", ScreenGui)
-Frame.Size = UDim2.new(0, 570, 0, 560)
 Frame.Position = isMobile and UDim2.new(0.5, -185, 0.5, -182) or UDim2.new(0, 300, 0, 300)
 Frame.BackgroundColor3 = Theme.Background
 Frame.BackgroundTransparency = Theme.BackgroundTrans
@@ -1465,7 +1464,7 @@ Frame.Visible = true
 
 local isMobile = (UserInputService.TouchEnabled and not UserInputService.MouseEnabled)
 local frameW = isMobile and 450 or 570
-local frameH = isMobile and 450 or 573
+local frameH = isMobile and 500 or 600
 
 local menuTw = TweenService:Create(Frame, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, frameW, 0, frameH)})
 table.insert(activeTweens, menuTw)
@@ -1483,7 +1482,7 @@ local function ToggleMenu(forceState)
     
     local isMobile = (UserInputService.TouchEnabled and not UserInputService.MouseEnabled)
     local frameW = isMobile and 450 or 570
-    local frameH = isMobile and 450 or 573
+    local frameH = isMobile and 500 or 500
     local glow = Frame:FindFirstChild("Glow") or (Frame.Parent and Frame.Parent:FindFirstChild("Glow"))
     
     local wlWindow = ScreenGui:FindFirstChild("WhitelistMenu")
@@ -1546,13 +1545,6 @@ local function ToggleMenu(forceState)
             local twWs = TweenService:Create(wsWindow, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 346, 0, 373)})
             table.insert(activeTweens, twWs)
             twWs:Play()
-        end
-        local srvWindow = ScreenGui:FindFirstChild("ServersMenu")
-        if _G.serversState and srvWindow then
-            srvWindow.Visible = true
-            local twSrv = TweenService:Create(srvWindow, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, 346, 0, 373)})
-            table.insert(activeTweens, twSrv)
-            twSrv:Play()
         end
     else
         HubBtn.Visible = true
@@ -1620,15 +1612,6 @@ local function ToggleMenu(forceState)
             twWs:Play()
             twWs.Completed:Connect(function(state)
                 if state == Enum.PlaybackState.Completed and not guiVisible then wsWindow.Visible = false end
-            end)
-        end
-        local srvWindow = ScreenGui:FindFirstChild("ServersMenu")
-        if _G.serversState and srvWindow then
-            local twSrv = TweenService:Create(srvWindow, TweenInfo.new(0.25, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 373)})
-            table.insert(activeTweens, twSrv)
-            twSrv:Play()
-            twSrv.Completed:Connect(function(state)
-                if state == Enum.PlaybackState.Completed and not guiVisible then srvWindow.Visible = false end
             end)
         end
     end
@@ -3855,15 +3838,17 @@ do
     createToggle("Aimbot & Silent Aim FOV", g, "fovEnabled")
     createSlider("FOV Size", g, 20, 350, settings.fov, 5, "fov")
     createSlider("Smoothness", g, 0, 100, settings.smoothness, 5, "smoothness")
-    createToggle("Predict", g, "predict")
+    createToggle("Predict", g, "predict", function(state) if state then settings.autoPredict = false end end)
     createSlider("Predict Strength", g, 1, 100, settings.predictStrength, 1, "predictStrength")
-    createToggle("Shoot While Sprinting", g, "shootWhileSprinting")
+    createToggle("Auto Predict", g, "autoPredict", function(state) if state then settings.predict = false end end)
+    createSlider("Auto Predict Calibration", g, 2750, 3250, settings.autoPredictCalibration or 2750, 1, "autoPredictCalibration")
 
     g = createGroup(Pages.PlayerRight)
     createToggle("Noclip", g, "noclip")
     createToggle("Jump Fly", g, "infiniteJump")
     createToggle("No fall damage", g, "noFallDmg", function(state) updateNoFallDmgState(state) end)
-    
+    createToggle("Shoot While Sprinting", g, "shootWhileSprinting")
+
     g = createGroup(Pages.PlayerRight)
     createDualActionButtons("TP to Custom", "Save custom TP", g,
         function()
@@ -7757,8 +7742,16 @@ game:GetService("RunService"):BindToRenderStep(espBindId, Enum.RenderPriority.Ca
             targetLocked = true 
             targetFovColor = Color3.fromRGB(255, 50, 50)
             local aimPos = activeTarget.Character.Head.Position
-            if settings.predict and activeTarget.Character:FindFirstChild("HumanoidRootPart") then
-                aimPos = aimPos + (activeTarget.Character.HumanoidRootPart.AssemblyLinearVelocity * (settings.predictStrength / 100))
+            if activeTarget.Character:FindFirstChild("HumanoidRootPart") then
+                if settings.autoPredict then
+                    settings.predict = false
+                    local dist = (Camera.CFrame.Position - aimPos).Magnitude
+                    local calcStrength = dist / (settings.autoPredictCalibration or 200)
+                    aimPos = aimPos + (activeTarget.Character.HumanoidRootPart.AssemblyLinearVelocity * calcStrength)
+                elseif settings.predict then
+                    settings.autoPredict = false
+                    aimPos = aimPos + (activeTarget.Character.HumanoidRootPart.AssemblyLinearVelocity * (settings.predictStrength / 100))
+                end
             end
             local targetCFrame = CFrame.new(Camera.CFrame.Position, aimPos)
             Camera.CFrame = settings.smoothness > 0 and Camera.CFrame:Lerp(targetCFrame, math.clamp((100 - settings.smoothness) / 100, 0.02, 1)) or targetCFrame
