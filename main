@@ -1482,7 +1482,7 @@ local function ToggleMenu(forceState)
     
     local isMobile = (UserInputService.TouchEnabled and not UserInputService.MouseEnabled)
     local frameW = isMobile and 450 or 570
-    local frameH = isMobile and 500 or 500
+    local frameH = isMobile and 500 or 600
     local glow = Frame:FindFirstChild("Glow") or (Frame.Parent and Frame.Parent:FindFirstChild("Glow"))
     
     local wlWindow = ScreenGui:FindFirstChild("WhitelistMenu")
