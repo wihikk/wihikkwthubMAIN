@@ -1472,6 +1472,10 @@ menuTw:Play()
 
 local glow = Frame:FindFirstChild("Glow") or (Frame.Parent and Frame.Parent:FindFirstChild("Glow"))
 if glow then
+    if isMobile and not glow:FindFirstChildOfClass("UIScale") then
+        local glowScale = Instance.new("UIScale", glow)
+        glowScale.Scale = 0.5
+    end
     local glowTw = TweenService:Create(glow, TweenInfo.new(0.35, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Size = UDim2.new(0, frameW + 30, 0, frameH + 30)})
     table.insert(activeTweens, glowTw)
     glowTw:Play()
